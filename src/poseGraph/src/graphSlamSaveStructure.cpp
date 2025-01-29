@@ -45,6 +45,26 @@ void graphSlamSaveStructure::addVertex(int key, const Eigen::Vector3d &positionV
     double tmpYaw = generalHelpfulTools::getRollPitchYaw(rotationVertex)[2];
     this->currentEstimate.insert(key,gtsam::Pose2(positionVertex[0],positionVertex[1],tmpYaw));
 }
+void graphSlamSaveStructure::addVertexPCL(int key, const Eigen::Vector3d &positionVertex,
+                                       const Eigen::Quaterniond &rotationVertex,
+                                       const Eigen::Matrix3d &covarianceMatrix,
+                                       pclMeasurement pclInput, double timeStamp,
+                                       int typeOfVertex) {
+
+    vertex vertexToAdd(key, positionVertex, rotationVertex, this->degreeOfFreedom,
+                       pclInput, covarianceMatrix, timeStamp, typeOfVertex);
+    this->vertexList.push_back(vertexToAdd);
+    //ADD BETTER INITIAL STATE
+    double tmpYaw = generalHelpfulTools::getRollPitchYaw(rotationVertex)[2];
+    if (this->degreeOfFreedom==3) {
+        this->currentEstimate.insert(key,gtsam::Pose2(positionVertex[0],positionVertex[1],tmpYaw));
+    }else {
+        if (this->degreeOfFreedom==6) {
+            this->currentEstimate.insert(key,gtsam::Pose3(gtsam::Rot3(rotationVertex),gtsam::Point3(positionVertex)));
+        }
+    }
+}
+
 
 
 void graphSlamSaveStructure::isam2OptimizeGraph(bool verbose, int numberOfUpdates) {
@@ -79,16 +99,32 @@ void graphSlamSaveStructure::isam2OptimizeGraph(bool verbose, int numberOfUpdate
 
 //    this->currentEstimate.print("Final Result:\n");
 //    gtsam::Marginals marginals(this->graph, this->currentEstimate);
+    switch (this->degreeOfFreedom) {
+        case 3:
+            for(int i  = 1 ; i<this->vertexList.size() ; i++){
+                gtsam::Pose2 iterativePose = this->currentEstimate.at(this->vertexList[i].getKey()).cast<gtsam::Pose2>();
+                this->vertexList.at(i).setPositionVertex(Eigen::Vector3d(iterativePose.x(),iterativePose.y(),0));
+                this->vertexList.at(i).setRotationVertex(generalHelpfulTools::getQuaternionFromRPY(0,0,iterativePose.theta()));
+                //        std::cout << "covariance:\n" << marginals.marginalCovariance(this->vertexList.at(i).getKey()) << std::endl;
+                //        std::cout << "Pose :\n" << iterativePose << std::endl;
+                this->vertexList.at(i).setCovarianceMatrix(this->isam->marginalCovariance(this->vertexList.at(i).getKey()));
+            }
+        break;
 
-
-    for(int i  = 1 ; i<this->vertexList.size() ; i++){
-        gtsam::Pose2 iterativePose = this->currentEstimate.at(this->vertexList[i].getKey()).cast<gtsam::Pose2>();
-        this->vertexList.at(i).setPositionVertex(Eigen::Vector3d(iterativePose.x(),iterativePose.y(),0));
-        this->vertexList.at(i).setRotationVertex(generalHelpfulTools::getQuaternionFromRPY(0,0,iterativePose.theta()));
-//        std::cout << "covariance:\n" << marginals.marginalCovariance(this->vertexList.at(i).getKey()) << std::endl;
-//        std::cout << "Pose :\n" << iterativePose << std::endl;
-        this->vertexList.at(i).setCovarianceMatrix(this->isam->marginalCovariance(this->vertexList.at(i).getKey()));
-
+        case 6:
+            for(int i  = 1 ; i<this->vertexList.size() ; i++){
+                gtsam::Pose3 iterativePose = this->currentEstimate.at(this->vertexList[i].getKey()).cast<gtsam::Pose3>();
+                this->vertexList.at(i).setPositionVertex(Eigen::Vector3d(iterativePose.x(),iterativePose.y(),iterativePose.z()));
+                 Eigen::Matrix<double, 3, 3> matrixTMP = iterativePose.rotation().matrix();
+                this->vertexList.at(i).setRotationVertex(Eigen::Quaterniond(matrixTMP));
+                //        std::cout << "covariance:\n" << marginals.marginalCovariance(this->vertexList.at(i).getKey()) << std::endl;
+                //        std::cout << "Pose :\n" << iterativePose << std::endl;
+                this->vertexList.at(i).setCovarianceMatrix(this->isam->marginalCovariance(this->vertexList.at(i).getKey()));
+            }
+        break;
+        default:
+            std::cout << "not yet implemented DOF XXXX" << std::endl;
+            std::exit(-1);
     }
 
     this->graph.resize(0);

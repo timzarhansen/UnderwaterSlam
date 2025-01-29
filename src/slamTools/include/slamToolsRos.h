@@ -18,6 +18,8 @@
 //#include "generalHelpfulTools.h"
 #include "scanRegistrationClass.h"
 
+
+
 #ifndef SIMULATION_BLUEROV_SLAMTOOLSROS_H
 #define SIMULATION_BLUEROV_SLAMTOOLSROS_H
 
@@ -52,6 +54,11 @@ struct DvlData {
 struct intensityValues {
     Eigen::Matrix4d transformation;
     intensityMeasurement intensity;
+    int type;
+};
+struct pclValues {
+    Eigen::Matrix4d transformation;
+    pcl::PointCloud<pcl::PointXYZ> pointCloud;
     int type;
 };
 struct transformationStamped {

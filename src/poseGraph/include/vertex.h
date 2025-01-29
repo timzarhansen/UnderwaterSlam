@@ -30,8 +30,19 @@ public:
             this->timeStamp = timeStamp;
             this->voxelData = NULL;
         } else {
-            std::cout << "not yet implemented DOF 6" << std::endl;
-            std::exit(-1);
+            if (degreeOfFreedom == 6) {
+                this->keyNumber = vertexNumber;
+                this->positionVertex = positionVertex;
+                this->rotationVertex = rotationVertex;
+                this->rotationVertex.normalize();
+                this->covariance = covariance;
+                this->typeOfVertex = typeOfVertex;
+                this->timeStamp = timeStamp;
+                this->voxelData = NULL;
+            }else {
+                std::cout << "not yet implemented DOF 6" << std::endl;
+                std::exit(-1);
+            }
         }
     }
 
@@ -70,11 +81,50 @@ public:
             this->typeOfVertex = typeOfVertex;
             this->timeStamp = timeStamp;
         } else {
-            std::cout << "not yet implemented DOF 6" << std::endl;
-            std::exit(-1);
+            if (degreeOfFreedom == 6) {
+                this->keyNumber = vertexNumber;
+                this->positionVertex = positionVertex;
+                this->rotationVertex = rotationVertex;
+                this->rotationVertex.normalize();
+                this->covariance = covariance;
+                this->typeOfVertex = typeOfVertex;
+                this->timeStamp = timeStamp;
+                this->voxelData = NULL;
+            }else {
+                std::cout << "not yet implemented DOF 6" << std::endl;
+                std::exit(-1);
+            }
         }
     }
-
+    //with PCL
+    vertex(int vertexNumber, const Eigen::Vector3d &positionVertex, const Eigen::Quaterniond &rotationVertex,
+           int degreeOfFreedom, pclMeasurement &pclMeasurements,
+           const Eigen::Matrix3d &covariance, double timeStamp, int typeOfVertex) {
+        if (degreeOfFreedom == 3) {
+            this->keyNumber = vertexNumber;
+            this->positionVertex = positionVertex;
+            this->rotationVertex = rotationVertex;
+            this->rotationVertex.normalize();
+            this->covariance = covariance;
+            this->pclMeasurements = pclMeasurements;
+            this->typeOfVertex = typeOfVertex;
+            this->timeStamp = timeStamp;
+        } else {
+            if (degreeOfFreedom == 6) {
+                this->keyNumber = vertexNumber;
+                this->positionVertex = positionVertex;
+                this->rotationVertex = rotationVertex;
+                this->rotationVertex.normalize();
+                this->covariance = covariance;
+                this->typeOfVertex = typeOfVertex;
+                this->timeStamp = timeStamp;
+                this->voxelData = NULL;
+            }else {
+                std::cout << "not yet implemented DOF 6" << std::endl;
+                std::exit(-1);
+            }
+        }
+    }
 
     [[nodiscard]] int getKey() const;
 
@@ -133,6 +183,7 @@ private:
     Eigen::Quaterniond rotationVertex;// rotation w.r.t. Initial Starting Rotation
     Eigen::Matrix3d covariance;
     intensityMeasurement intensities;
+    pclMeasurement pclMeasurements;
     Eigen::Matrix4d groundTruthTransformation;
     double numberOfMarkersSeen;
     double *voxelData;

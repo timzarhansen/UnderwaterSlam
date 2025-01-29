@@ -288,75 +288,75 @@ scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::Poi
 //    return transformationsList[distanceToMaxElement].inverse();
 //}
 
-
-Eigen::Matrix4d scanRegistrationClass::ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                  pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                  Eigen::Matrix4d initialGuess,
-                                                  bool useInitialGuess) {
-    std::lock_guard<std::mutex> guard(*this->ndtd2dMutex);
-    Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
-    pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
-    pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
-//    initialGuess(0, 1) = -initialGuess(0, 1);
-//    initialGuess(1, 0) = -initialGuess(1, 0);
-//    initialGuess(1, 3) = -initialGuess(1, 3);
-
-
-    double __res[] = {0.5, 1, 2, 4};
-    std::vector<double> resolutions(__res, __res + sizeof(__res) / sizeof(double));
-
-
-    Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
-//    Tout.setIdentity();
-
-
-//    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
-
-    lslgeneric::NDTMatcherD2D_2D<pcl::PointXYZ, pcl::PointXYZ> matcherD2D(false, false, resolutions);
-
-    bool ret = matcherD2D.match(cloudFirstScan, cloudSecondScan, Tout, useInitialGuess);
-
-//    Tout(0, 1) = -Tout(0, 1);
-//    Tout(1, 0) = -Tout(1, 0);
-//    Tout(1, 3) = -Tout(1, 3);
-
-//    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
-    return Tout.matrix();
-}
-
-Eigen::Matrix4d scanRegistrationClass::ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                               pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                               Eigen::Matrix4d initialGuess,
-                                               bool useInitialGuess) {
-    std::lock_guard<std::mutex> guard(*this->ndtp2dMutex);
-    Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
-    pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
-    pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
-
-//    initialGuess(0, 1) = -initialGuess(0, 1);
-//    initialGuess(1, 0) = -initialGuess(1, 0);
-//    initialGuess(1, 3) = -initialGuess(1, 3);
 //
-//    printf("X %f Y %f Z %f Roll %f Pitch %f Yaw %f \n",xoffset,yoffset,zoffset,roll,pitch,yaw);
+// Eigen::Matrix4d scanRegistrationClass::ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                   Eigen::Matrix4d initialGuess,
+//                                                   bool useInitialGuess) {
+//     std::lock_guard<std::mutex> guard(*this->ndtd2dMutex);
+//     Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
+//     pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
+//     pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
+// //    initialGuess(0, 1) = -initialGuess(0, 1);
+// //    initialGuess(1, 0) = -initialGuess(1, 0);
+// //    initialGuess(1, 3) = -initialGuess(1, 3);
+//
+//
+//     double __res[] = {0.5, 1, 2, 4};
+//     std::vector<double> resolutions(__res, __res + sizeof(__res) / sizeof(double));
+//
+//
+//     Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
+// //    Tout.setIdentity();
+//
+//
+// //    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
+//
+//     lslgeneric::NDTMatcherD2D_2D<pcl::PointXYZ, pcl::PointXYZ> matcherD2D(false, false, resolutions);
+//
+//     bool ret = matcherD2D.match(cloudFirstScan, cloudSecondScan, Tout, useInitialGuess);
+//
+// //    Tout(0, 1) = -Tout(0, 1);
+// //    Tout(1, 0) = -Tout(1, 0);
+// //    Tout(1, 3) = -Tout(1, 3);
+//
+// //    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
+//     return Tout.matrix();
+// }
 
-
-    Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
-
-//    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
-
-    lslgeneric::NDTMatcherP2D<pcl::PointXYZ, pcl::PointXYZ> matcherP2D;
-
-    bool ret = matcherP2D.match(cloudFirstScan, cloudSecondScan, Tout);
-
-//    Tout(0, 1) = Tout(0, 1);
-//    Tout(1, 0) = Tout(1, 0);
-//    Tout(1, 3) = Tout(1, 3);
-
-//    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
-
-
-    return Tout.matrix();
-}
+// Eigen::Matrix4d scanRegistrationClass::ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                Eigen::Matrix4d initialGuess,
+//                                                bool useInitialGuess) {
+//     std::lock_guard<std::mutex> guard(*this->ndtp2dMutex);
+//     Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
+//     pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
+//     pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
+//
+// //    initialGuess(0, 1) = -initialGuess(0, 1);
+// //    initialGuess(1, 0) = -initialGuess(1, 0);
+// //    initialGuess(1, 3) = -initialGuess(1, 3);
+// //
+// //    printf("X %f Y %f Z %f Roll %f Pitch %f Yaw %f \n",xoffset,yoffset,zoffset,roll,pitch,yaw);
+//
+//
+//     Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
+//
+// //    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
+//
+//     // lslgeneric::NDTMatcherP2D<pcl::PointXYZ, pcl::PointXYZ> matcherP2D;
+//
+//     bool ret = matcherP2D.match(cloudFirstScan, cloudSecondScan, Tout);
+//
+// //    Tout(0, 1) = Tout(0, 1);
+// //    Tout(1, 0) = Tout(1, 0);
+// //    Tout(1, 3) = Tout(1, 3);
+//
+// //    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
+//
+//
+//     return Tout.matrix();
+// }
 
 
 //Eigen::Vector2d scanRegistrationClass::sofftRegistrationVoxel2DTranslation(double voxelData1Input[],
@@ -391,7 +391,7 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
 //    int k = cv::waitKey(0); // Wait for a keystroke in the window
 
 
-    auto request = std::make_shared<fs2d::srv::RequestOnePotentialSolution::Request>();
+    auto request = std::make_shared<fsregistration::srv::RequestOnePotentialSolution2D::Request>();
     double overallMax = std::max(maximumVoxel1,maximumVoxel2);
 //    fs2d::srv::RequestOnePotentialSolution::Request request;
     for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData ; i++){
@@ -474,7 +474,7 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
     return resultingTransformation;
 }
 
-std::vector<fs2d::msg::PotentialSolution>
+std::vector<fsregistration::msg::PotentialSolution2D>
 scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
@@ -484,7 +484,7 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
 
 
 
-    auto request = std::make_shared<fs2d::srv::RequestListPotentialSolution::Request>();
+    auto request = std::make_shared<fsregistration::srv::RequestListPotentialSolution2D::Request>();
     double overallMax = std::max(maximumVoxel1,maximumVoxel2);
 //    fs2d::srv::RequestOnePotentialSolution::Request request;
     for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData ; i++){
@@ -521,7 +521,7 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
     request->potential_for_necessary_peak = 0.1;
     request->size_image = this->sizeVoxelData;
 
-    std::vector<fs2d::msg::PotentialSolution> ourListOfResults;
+    std::vector<fsregistration::msg::PotentialSolution2D> ourListOfResults;
 
     auto future2 = this->listPotentialClient->async_send_request(request);
     Eigen::Matrix4d resultingTransformation;
@@ -871,109 +871,109 @@ Eigen::Matrix4d scanRegistrationClass::registrationFeatureBased(double voxelData
 
 
 
-
-Eigen::Matrix4d scanRegistrationClass::gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                   Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
-    std::lock_guard<std::mutex> guard(*this->gmmd2dMutex);
-
-    //Convert scan to 2D vector xy points.
-    std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
-    std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
-    for(int i = 0 ; i <cloudFirstScan.points.size();i++){
-        currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    for(int i = 0 ; i <cloudSecondScan.points.size();i++){
-        referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-    // reference scan
-    shared_ptr<GaussianMixturesModel<2>> reference_gmm;
-
-    reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
-    reference_gmm->balance_covariances(0.05);
-//    reference_gmm->plot_components_density(0, referenceScanVector, false);
-
-    // current Scan
-    shared_ptr<GaussianMixturesModel<2>> current_gmm;
-    current_gmm = bayesian_gmm_constructor(currentScanVector, 50);
-    current_gmm->balance_covariances(0.05);
-//    current_gmm->plot_components_density(1, currentScanVector, false);
-
-
-    shared_ptr<DistributionToDistribution2D> method(new DistributionToDistribution2D(reference_gmm, current_gmm));
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-    solver->compute_optimum();
-//    solver->plot_process(0, false, 0.01);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-
-//  convert t_opt to Matrix4d
-    std::cout << t_opt << std::endl;
-    Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
-    returnMatrix(0,3) = t_opt[0];
-    returnMatrix(1,3) = t_opt[1];
-
-    if(h_opt.isZero(0.0000001)){
-        returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-
-    }
-    return returnMatrix;
-
-
-}
-
-Eigen::Matrix4d scanRegistrationClass::gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                          pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                          Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
-    std::lock_guard<std::mutex> guard(*this->gmmp2dMutex);
-
-    //Convert scan to 2D vector xy points.
-    std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
-    std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
-    for(int i = 0 ; i <cloudFirstScan.points.size();i++){
-        currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    for(int i = 0 ; i <cloudSecondScan.points.size();i++){
-        referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    // reference scan
-    shared_ptr<GaussianMixturesModel<2>> reference_gmm;
-
-    reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
-    reference_gmm->balance_covariances(0.05);
-//    reference_gmm->plot_components_density(0, referenceScanVector, false);
-//    std::cout << "test3:" <<reference_gmm->k() << std::endl;
-
-    // current Scan
-//    shared_ptr<GaussianMixturesModel<2>> current_gmm;
-//    current_gmm = bayesian_gmm_constructor(currentScanVector, 10);
-//    current_gmm->balance_covariances(0.05);
-//    current_gmm->plot_components_density(1, currentScanVector, true);
-
-
-    shared_ptr<PointsToDistribution2D> method(
-            new PointsToDistribution2D(reference_gmm, std::make_shared<std::vector<Eigen::Vector2d>>(currentScanVector)));
-
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-    solver->compute_optimum();
-//    solver->plot_process(0, false, 0.01);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-
-//  convert t_opt to Matrix4d
-    Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
-    returnMatrix(0,3) = t_opt[0];
-    returnMatrix(1,3) = t_opt[1];
-
-    if(h_opt.isZero(0.0000001) ){
-        returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-    }
-    return returnMatrix;
-}
+//
+// Eigen::Matrix4d scanRegistrationClass::gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                    pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                    Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
+//     std::lock_guard<std::mutex> guard(*this->gmmd2dMutex);
+//
+//     //Convert scan to 2D vector xy points.
+//     std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
+//     std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
+//     for(int i = 0 ; i <cloudFirstScan.points.size();i++){
+//         currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     for(int i = 0 ; i <cloudSecondScan.points.size();i++){
+//         referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//     // reference scan
+//     shared_ptr<GaussianMixturesModel<2>> reference_gmm;
+//
+//     reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
+//     reference_gmm->balance_covariances(0.05);
+// //    reference_gmm->plot_components_density(0, referenceScanVector, false);
+//
+//     // current Scan
+//     shared_ptr<GaussianMixturesModel<2>> current_gmm;
+//     current_gmm = bayesian_gmm_constructor(currentScanVector, 50);
+//     current_gmm->balance_covariances(0.05);
+// //    current_gmm->plot_components_density(1, currentScanVector, false);
+//
+//
+//     shared_ptr<DistributionToDistribution2D> method(new DistributionToDistribution2D(reference_gmm, current_gmm));
+//     unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
+//     solver->compute_optimum();
+// //    solver->plot_process(0, false, 0.01);
+//     Eigen::Vector3d t_opt = solver->get_optimal();
+//     Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
+//
+// //  convert t_opt to Matrix4d
+//     std::cout << t_opt << std::endl;
+//     Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
+//     returnMatrix(0,3) = t_opt[0];
+//     returnMatrix(1,3) = t_opt[1];
+//
+//     if(h_opt.isZero(0.0000001)){
+//         returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//
+//     }
+//     return returnMatrix;
+//
+//
+// }
+//
+// Eigen::Matrix4d scanRegistrationClass::gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                           pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                           Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
+//     std::lock_guard<std::mutex> guard(*this->gmmp2dMutex);
+//
+//     //Convert scan to 2D vector xy points.
+//     std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
+//     std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
+//     for(int i = 0 ; i <cloudFirstScan.points.size();i++){
+//         currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     for(int i = 0 ; i <cloudSecondScan.points.size();i++){
+//         referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     // reference scan
+//     shared_ptr<GaussianMixturesModel<2>> reference_gmm;
+//
+//     reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
+//     reference_gmm->balance_covariances(0.05);
+// //    reference_gmm->plot_components_density(0, referenceScanVector, false);
+// //    std::cout << "test3:" <<reference_gmm->k() << std::endl;
+//
+//     // current Scan
+// //    shared_ptr<GaussianMixturesModel<2>> current_gmm;
+// //    current_gmm = bayesian_gmm_constructor(currentScanVector, 10);
+// //    current_gmm->balance_covariances(0.05);
+// //    current_gmm->plot_components_density(1, currentScanVector, true);
+//
+//
+//     shared_ptr<PointsToDistribution2D> method(
+//             new PointsToDistribution2D(reference_gmm, std::make_shared<std::vector<Eigen::Vector2d>>(currentScanVector)));
+//
+//     unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
+//     solver->compute_optimum();
+// //    solver->plot_process(0, false, 0.01);
+//     Eigen::Vector3d t_opt = solver->get_optimal();
+//     Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
+//
+// //  convert t_opt to Matrix4d
+//     Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
+//     returnMatrix(0,3) = t_opt[0];
+//     returnMatrix(1,3) = t_opt[1];
+//
+//     if(h_opt.isZero(0.0000001) ){
+//         returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//     }
+//     return returnMatrix;
+// }

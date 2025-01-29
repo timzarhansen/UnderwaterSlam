@@ -2,6 +2,8 @@
 // Created by tim-linux on 18.03.22.
 //
 #include <vector>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #define POINT_CLOUD_SAVED 0
 #define INTEGRATED_POSE 1
 #define FIRST_ENTRY 2
@@ -19,7 +21,10 @@ struct intensityMeasurement {
     double range;
     std::vector<double> intensities;
 };
-
+struct pclMeasurement {
+    double time;
+    pcl::PointCloud<pcl::PointXYZ> pointcloud;
+};
 
 
 

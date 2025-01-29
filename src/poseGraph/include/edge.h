@@ -21,13 +21,26 @@ public:
             this->positionDifference = positionDifference;
             this->rotationDifference = rotationDifference;
             this->rotationDifference.normalize();
-            this->covariancePosition = covariancePosition;
-            this->covarianceQuaternion = covarianceQuaternion;
+            Eigen::Vector3d covariancePositionTMP(covarianceMatrix(0,0), covarianceMatrix(1,1), 0);
+            this->covariancePosition = covariancePositionTMP;
+            this->covarianceQuaternion = covarianceMatrix(2,2);
             this->keyOfEdgeInGraph = keyOfEdgeInGraph;
-
         } else {
-            std::cout << "not yet implemented DOF 6" << std::endl;
+            if (degreeOfFreedom == 6) {
+                this->fromKey = fromVertex;
+                this->toKey = toVertex;
+                this->positionDifference = positionDifference;
+                this->rotationDifference = rotationDifference;
+                this->rotationDifference.normalize();
+                Eigen::Vector3d covariancePositionTMP(covarianceMatrix(0,0), covarianceMatrix(1,1), covarianceMatrix(1,1));
+                this->covariancePosition = covariancePositionTMP;
+                this->covarianceQuaternion = covarianceMatrix(2,2);
+                this->keyOfEdgeInGraph = keyOfEdgeInGraph;
+            }else {
+            std::cout << "not yet implemented DOF XX" << std::endl;
             std::exit(-1);
+        }
+
         }
         this->typeOfEdge = typeOfEdge;
 

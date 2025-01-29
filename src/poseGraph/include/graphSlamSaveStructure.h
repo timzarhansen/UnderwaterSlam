@@ -13,6 +13,7 @@
 #include "generalHelpfulTools.h"
 //gtsam includes
 #include <gtsam/geometry/Pose2.h>
+#include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Key.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
@@ -29,30 +30,50 @@
 
 class graphSlamSaveStructure {
 public:
-    graphSlamSaveStructure(int degreeOfFreedom,int typeOfGraphSlam){
+    graphSlamSaveStructure(int degreeOfFreedom, int typeOfGraphSlam) {
         if (degreeOfFreedom == 3) {
             this->degreeOfFreedom = degreeOfFreedom;
-            this->typeOfGraphSlam =typeOfGraphSlam;
-        } else {
-            std::cout << "not yet implemented DOF 6" << std::endl;
-            std::exit(-1);
+            this->typeOfGraphSlam = typeOfGraphSlam;
+
+            //adds the Prior. Makes sure that the initial position is at 0 0 0 and stays there.
+            auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.1, 0.1, 0.01));
+            this->graph.addPrior(0, gtsam::Pose2(0, 0, 0), priorNoise);
+
+            //        this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.02, 0.02, 0.005));
+            this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.03, 0.03, 0.01));
+            this->loopClosureNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 0.05));
+
+            gtsam::ISAM2Params parameters;
+            parameters.relinearizeThreshold = 0.01;
+            parameters.relinearizeSkip = 1;
+            parameters.print();
+            isam = new gtsam::ISAM2(parameters);
+
+
+        }else {
+            if (degreeOfFreedom == 6) {
+                this->degreeOfFreedom = degreeOfFreedom;
+                this->typeOfGraphSlam = typeOfGraphSlam;
+
+                //adds the Prior. Makes sure that the initial position is at 0 0 0 and stays there.
+                auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(0.1, 0.1, 0.1,0.01,0.01,0.01));
+                this->graph.addPrior(0, gtsam::Pose3(gtsam::Rot3(gtsam::Matrix3::Identity()),gtsam::Point3(0,0,0)), priorNoise);
+
+                //        this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.02, 0.02, 0.005));
+                this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(0.03, 0.03, 0.03,0.01,0.01,0.01));
+                this->loopClosureNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 1,0.05,0.05,0.05));
+
+                gtsam::ISAM2Params parameters;
+                parameters.relinearizeThreshold = 0.01;
+                parameters.relinearizeSkip = 1;
+                parameters.print();
+                isam = new gtsam::ISAM2(parameters);
+
+            } else {
+                std::cout << "not implemented DOF: " <<degreeOfFreedom<<std::endl;
+                std::exit(-1);
+            }
         }
-
-        //adds the Prior. Makes sure that the initial position is at 0 0 0 and stays there.
-        auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.1, 0.1, 0.01));
-        this->graph.addPrior(0, gtsam::Pose2(0, 0, 0), priorNoise);
-        
-//        this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.02, 0.02, 0.005));
-        this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.03, 0.03, 0.01));
-        this->loopClosureNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 0.05));
-
-        gtsam::ISAM2Params parameters;
-        parameters.relinearizeThreshold = 0.01;
-        parameters.relinearizeSkip = 1;
-        parameters.print();
-        isam = new gtsam::ISAM2(parameters);
-
-
     }
 
     void addEdge(int fromKey, int toKey, Eigen::Vector3d positionDifference,
@@ -62,6 +83,9 @@ public:
                    const Eigen::Matrix3d &covarianceMatrix,
                    intensityMeasurement intensityInput, double timeStamp, int typeOfVertex);
 
+    void addVertexPCL(int key, const Eigen::Vector3d &positionVertex, const Eigen::Quaterniond &rotationVertex,
+                      const Eigen::Matrix3d &covarianceMatrix,
+                      pclMeasurement pclInput, double timeStamp, int typeOfVertex);
 
 
     void printCurrentState();
@@ -85,23 +109,14 @@ public:
     void print();
 
 private:
-
-
-
-
-
-    int degreeOfFreedom;//3 for [x y alpha] or 6 for [x y z alpha beta gamma]
+    int degreeOfFreedom; //3 for [x y alpha] or 6 for [x y z alpha beta gamma]
     int typeOfGraphSlam;
     std::vector<edge> edgeList;
     std::vector<vertex> vertexList;
     gtsam::NonlinearFactorGraph graph;
     boost::shared_ptr<gtsam::noiseModel::Diagonal> deadReckoningNoiseModel, loopClosureNoiseModel;
     gtsam::Values currentEstimate;
-    gtsam::ISAM2* isam;
-
-
-
-
+    gtsam::ISAM2 *isam;
 };
 
 

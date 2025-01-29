@@ -3,13 +3,15 @@
 //
 #include "rclcpp/rclcpp.hpp"
 #include <iostream>
-#include "fs2d/srv/request_one_potential_solution.hpp"
-#include "fs2d/srv/request_list_potential_solution.hpp"
+// #include "fsregistration/srv/req.hpp"
+// #include "fsregistration/srv/request_list_potential_solution_2d.hpp"
+#include "fsregistration/srv/request_list_potential_solution2_d.hpp"
+#include "fsregistration/srv/request_one_potential_solution2_d.hpp"
 #include <opencv4/opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv4/opencv2/core.hpp>
 #include "opencv4/opencv2/calib3d.hpp"
-#include "cv_bridge/cv_bridge.h"
+// #include "cv_bridge/cv_bridge.h"
 #include "generalHelpfulTools.h"
 #include <tf2/transform_datatypes.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -50,8 +52,8 @@
 
 
 
-#include <ndt_matcher_p2d.h>
-#include <ndt_matcher_d2d_2d.h>
+// #include <ndt_matcher_p2d.h>
+// #include <ndt_matcher_d2d_2d.h>
 //#include "perception_oru/ndt_matcher_d2d_2d.h"
 //#include "include/ndt_matcher_d2d_2d.h"
 //#include "perception_oru/include/ndt_matcher_p2d.h"
@@ -69,11 +71,11 @@
 
 
 
-#include <gmm_registration/front_end/GaussianMixturesModel.h>
-#include <gmm_registration/front_end/GmmFrontEnd.hpp>
-#include <gmm_registration/method/DistributionToDistribution2D.h>
-#include <gmm_registration/solver/CholeskyLineSearchNewtonMethod.h>
-#include <gmm_registration/method/PointsToDistribution2D.h>
+// #include <gmm_registration/front_end/GaussianMixturesModel.h>
+// #include <gmm_registration/front_end/GmmFrontEnd.hpp>
+// #include <gmm_registration/method/DistributionToDistribution2D.h>
+// #include <gmm_registration/solver/CholeskyLineSearchNewtonMethod.h>
+// #include <gmm_registration/method/PointsToDistribution2D.h>
 
 
 
@@ -118,10 +120,10 @@ public:
         gmmp2dMutex = new std::mutex();
 
 
-        this->onePotentialClient = this->create_client<fs2d::srv::RequestOnePotentialSolution>(
-                "fs2d/registration/one_solution");
-        this->listPotentialClient = this->create_client<fs2d::srv::RequestListPotentialSolution>(
-                "fs2d/registration/all_solutions");
+        this->onePotentialClient = this->create_client<fsregistration::srv::RequestOnePotentialSolution2D>(
+                "fsregistration/registration/one_solution");
+        this->listPotentialClient = this->create_client<fsregistration::srv::RequestListPotentialSolution2D>(
+                "fsregistration/registration/all_solutions");
 
     }
 
@@ -190,7 +192,7 @@ public:
                                                      Eigen::Matrix3d &covarianceMatrix,
                                                      double cellSize,double &timeToCalculate);
 
-    std::vector<fs2d::msg::PotentialSolution> registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+    std::vector<fsregistration::msg::PotentialSolution2D> registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
                                                                                   double voxelData2Input[],double maximumVoxel2,
                                                                                   Eigen::Matrix4d initialGuess,
                                                                                   Eigen::Matrix3d &covarianceMatrix,
@@ -218,8 +220,8 @@ public:
 
 private:
 //    softDescriptorRegistration mySofftRegistrationClass;
-    rclcpp::Client<fs2d::srv::RequestOnePotentialSolution>::SharedPtr onePotentialClient;
-    rclcpp::Client<fs2d::srv::RequestListPotentialSolution>::SharedPtr listPotentialClient;
+    rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution2D>::SharedPtr onePotentialClient;
+    rclcpp::Client<fsregistration::srv::RequestListPotentialSolution2D>::SharedPtr listPotentialClient;
     int sizeVoxelData;
 
     std::mutex *icpMutex,*ndtd2dMutex,*ndtp2dMutex,*fourierMellinMutex,*oursMutex,*featureBasedMutex,*gmmd2dMutex,*gmmp2dMutex;
