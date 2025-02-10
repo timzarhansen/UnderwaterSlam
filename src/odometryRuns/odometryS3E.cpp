@@ -55,7 +55,7 @@ public:
     rosClassSlam() : Node("odometrypublisher"), graphSaved(6, POINT_CLOUD_SAVED)
     {
         //Parameter Definitions
-        this->declare_parameter<int>("number_of_skips", 10);
+        this->declare_parameter<int>("number_of_skips", 1);
         this->declare_parameter<std::string>("pcl_topic_name", "/Bob/velodyne_points");
         this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
         this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
