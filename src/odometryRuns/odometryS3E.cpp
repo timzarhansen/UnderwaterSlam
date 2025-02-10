@@ -65,12 +65,19 @@ public:
 
 
         this->which_registration = this->get_parameter("which_registration").as_string();
+        std::cout << "which_registration: " << which_registration << std::endl;
         this->number_of_skips = this->get_parameter("number_of_skips").as_int();
+         std::cout << "number_of_skips: " << this->number_of_skips << std::endl;
         this->pcl_topic_name= this->get_parameter("pcl_topic_name").as_string();
+         std::cout << "pcl_topic_name: " << this->pcl_topic_name << std::endl;
         this->pose_topic_name= this->get_parameter("pose_topic_name").as_string();
+         std::cout << "pose_topic_name: " << this->pose_topic_name << std::endl;
         this->gt_topic_name= this->get_parameter("gt_topic_name").as_string();
+        std::cout << "gt_topic_name: " << this->gt_topic_name << std::endl;
         this->time_until_save= this->get_parameter("time_until_save").as_int();
+        std::cout << "time_until_save: " << this->time_until_save << std::endl;
         this->scan_radius_max= this->get_parameter("scan_radius_max").as_double();
+        std::cout << "scan_radius_max: " << this->scan_radius_max << std::endl;
 
 
 
