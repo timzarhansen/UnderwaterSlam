@@ -25,8 +25,9 @@ public:
             this->positionVertex = positionVertex;
             this->rotationVertex = rotationVertex;
             this->rotationVertex.normalize();
-            this->covariance = covariance;
+            this->covariance2D = covariance;
             this->typeOfVertex = typeOfVertex;
+            this->groundTruthTransformation = Eigen::Matrix4d::Identity();
             this->timeStamp = timeStamp;
             this->voxelData = NULL;
         } else {
@@ -35,9 +36,10 @@ public:
                 this->positionVertex = positionVertex;
                 this->rotationVertex = rotationVertex;
                 this->rotationVertex.normalize();
-                this->covariance = covariance;
+                this->covariance2D = covariance;
                 this->typeOfVertex = typeOfVertex;
                 this->timeStamp = timeStamp;
+                this->groundTruthTransformation = Eigen::Matrix4d::Identity();
                 this->voxelData = NULL;
             }else {
                 std::cout << "not yet implemented DOF 6" << std::endl;
@@ -76,8 +78,9 @@ public:
             this->positionVertex = positionVertex;
             this->rotationVertex = rotationVertex;
             this->rotationVertex.normalize();
-            this->covariance = covariance;
+            this->covariance2D = covariance;
             this->intensities = intensities;
+            this->groundTruthTransformation = Eigen::Matrix4d::Identity();
             this->typeOfVertex = typeOfVertex;
             this->timeStamp = timeStamp;
         } else {
@@ -86,8 +89,9 @@ public:
                 this->positionVertex = positionVertex;
                 this->rotationVertex = rotationVertex;
                 this->rotationVertex.normalize();
-                this->covariance = covariance;
+                this->covariance2D = covariance;
                 this->typeOfVertex = typeOfVertex;
+                this->groundTruthTransformation = Eigen::Matrix4d::Identity();
                 this->timeStamp = timeStamp;
                 this->voxelData = NULL;
             }else {
@@ -105,8 +109,9 @@ public:
             this->positionVertex = positionVertex;
             this->rotationVertex = rotationVertex;
             this->rotationVertex.normalize();
-            this->covariance = covariance;
+            this->covariance2D = covariance;
             this->pclMeasurements = pclMeasurements;
+            this->groundTruthTransformation = Eigen::Matrix4d::Identity();
             this->typeOfVertex = typeOfVertex;
             this->timeStamp = timeStamp;
         } else {
@@ -115,7 +120,16 @@ public:
                 this->positionVertex = positionVertex;
                 this->rotationVertex = rotationVertex;
                 this->rotationVertex.normalize();
-                this->covariance = covariance;
+                Eigen::MatrixXd covariance6DMatrix(6, 6);
+                covariance6DMatrix(0, 0) = covariance(0, 0);
+                covariance6DMatrix(1, 1) = covariance(0, 0);
+                covariance6DMatrix(2, 2) = covariance(0, 0);
+                covariance6DMatrix(3, 3) = covariance(2, 2);
+                covariance6DMatrix(4, 4) = covariance(2, 2);
+                covariance6DMatrix(5, 5) = covariance(2, 2);
+                this->covariance3D = covariance;
+                this->pclMeasurements = pclMeasurements;
+                this->groundTruthTransformation = Eigen::Matrix4d::Identity();
                 this->typeOfVertex = typeOfVertex;
                 this->timeStamp = timeStamp;
                 this->voxelData = NULL;
@@ -148,8 +162,9 @@ public:
 
     const Eigen::Matrix3d getCovarianceMatrix() const;
 
-    void setCovarianceMatrix(Eigen::Matrix3d covariancePositionInput);
+    void setCovarianceMatrix2D(Eigen::Matrix3d covariancePositionInput);
 
+    void setCovarianceMatrix3D(Eigen::MatrixXd covariancePositionInput);
 
     Eigen::Matrix4d getTransformation();
 
@@ -177,11 +192,14 @@ public:
 
     double getNumberOfMarkersSeen() const;
 
+    pclMeasurement getPCLMeasurement() ;
+
 private:
     int keyNumber;
     Eigen::Vector3d positionVertex;// position w.r.t. Initiial Starting Position
     Eigen::Quaterniond rotationVertex;// rotation w.r.t. Initial Starting Rotation
-    Eigen::Matrix3d covariance;
+    Eigen::Matrix3d covariance2D;
+    Eigen::MatrixXd covariance3D;
     intensityMeasurement intensities;
     pclMeasurement pclMeasurements;
     Eigen::Matrix4d groundTruthTransformation;

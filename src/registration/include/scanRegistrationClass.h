@@ -7,6 +7,9 @@
 // #include "fsregistration/srv/request_list_potential_solution_2d.hpp"
 #include "fsregistration/srv/request_list_potential_solution2_d.hpp"
 #include "fsregistration/srv/request_one_potential_solution2_d.hpp"
+#include "fsregistration/srv/request_list_potential_solution3_d.hpp"
+#include "fsregistration/srv/request_one_potential_solution3_d.hpp"
+
 #include <opencv4/opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv4/opencv2/core.hpp>
@@ -107,7 +110,7 @@ struct transformationPeakSLAM {
 
 class scanRegistrationClass : public rclcpp::Node {
 public:
-    scanRegistrationClass(int N = 64, int bwOut = 64 / 2, int bwIn = 64 / 2, int degLim = 64 / 2 - 1,std::string nameOfNode = "registrationnode" )
+    scanRegistrationClass(int N = 64,std::string nameOfNode = "registrationnode" )
             : Node(nameOfNode) {
         sizeVoxelData = N;
         icpMutex = new std::mutex();
@@ -120,10 +123,14 @@ public:
         gmmp2dMutex = new std::mutex();
 
 
-        this->onePotentialClient = this->create_client<fsregistration::srv::RequestOnePotentialSolution2D>(
+        this->onePotentialClient2D = this->create_client<fsregistration::srv::RequestOnePotentialSolution2D>(
                 "fsregistration/registration/one_solution");
-        this->listPotentialClient = this->create_client<fsregistration::srv::RequestListPotentialSolution2D>(
+        this->listPotentialClient2D = this->create_client<fsregistration::srv::RequestListPotentialSolution2D>(
                 "fsregistration/registration/all_solutions");
+        this->listPotentialClient3D = this->create_client<fsregistration::srv::RequestListPotentialSolution3D>(
+        "fs3D/registration/all_solutions");
+//         this->onePotentialClient3D = this->create_client<fsregistration::srv::RequestOnePotentialSolution3D>(
+// "fsregistration/registration/all_solutions");
 
     }
 
@@ -135,15 +142,15 @@ public:
 //                                                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
 //                                                            double &fitnessScore);
 //
-    Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                            double &fitnessScore, Eigen::Matrix4d &guess);
-//
-    Eigen::Matrix4d generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                      pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                      pcl::PointCloud<pcl::PointXYZ> &Final,
-                                                      double &fitnessScore,
-                                                      Eigen::Matrix4d &initialGuessTransformation);
+//     Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                             pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                             double &fitnessScore, Eigen::Matrix4d &guess);
+// //
+//     Eigen::Matrix4d generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                       pcl::PointCloud<pcl::PointXYZ> &Final,
+//                                                       double &fitnessScore,
+//                                                       Eigen::Matrix4d &initialGuessTransformation);
 //
 //    Eigen::Matrix4d sofftRegistration2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
 //                                        pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData2,
@@ -178,13 +185,13 @@ public:
 //                                          pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
 //                                          Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug = false);
 
-    Eigen::Matrix4d ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                               pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan, Eigen::Matrix4d initialGuess,
-                               bool useInitialGuess);
-
-    Eigen::Matrix4d ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan, Eigen::Matrix4d initialGuess,
-                            bool useInitialGuess);
+    // Eigen::Matrix4d ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+    //                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan, Eigen::Matrix4d initialGuess,
+    //                            bool useInitialGuess);
+    //
+    // Eigen::Matrix4d ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+    //                         pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan, Eigen::Matrix4d initialGuess,
+    //                         bool useInitialGuess);
 
     Eigen::Matrix4d registrationOfTwoVoxelsSOFFTFast(double voxelData1Input[],double maximumVoxel1,
                                                      double voxelData2Input[],double maximumVoxel2,
@@ -198,30 +205,38 @@ public:
                                                                                   Eigen::Matrix3d &covarianceMatrix,
                                                                                   double cellSize,double &timeToCalculate);
 
-    Eigen::Matrix4d registrationFourerMellin(double voxelData1Input[],
-                                             double voxelData2Input[],
-                                             double cellSize,
-                                             bool debug = false);
+    std::vector<fsregistration::msg::PotentialSolution3D> registrationOfTwoVoxels3DSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+                                                                 double voxelData2Input[],double maximumVoxel2,
+                                                                 Eigen::Matrix4d initialGuess,
+                                                                 Eigen::Matrix3d &covarianceMatrix,
+                                                                 double cellSize,double &timeToCalculate);
 
-    Eigen::Matrix4d registrationFeatureBased(double voxelData1Input[],
-                                             double voxelData2Input[],
-                                             double cellSize,int methodType,
-                                             bool debug = false);
-
-    Eigen::Matrix4d gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                       Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug = false);
-
-    Eigen::Matrix4d gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                       Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug = false);
+    // Eigen::Matrix4d registrationFourerMellin(double voxelData1Input[],
+    //                                          double voxelData2Input[],
+    //                                          double cellSize,
+    //                                          bool debug = false);
+    //
+    // Eigen::Matrix4d registrationFeatureBased(double voxelData1Input[],
+    //                                          double voxelData2Input[],
+    //                                          double cellSize,int methodType,
+    //                                          bool debug = false);
+    //
+    // Eigen::Matrix4d gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+    //                                    pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+    //                                    Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug = false);
+    //
+    // Eigen::Matrix4d gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+    //                                    pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+    //                                    Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug = false);
 
 
 
 private:
 //    softDescriptorRegistration mySofftRegistrationClass;
-    rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution2D>::SharedPtr onePotentialClient;
-    rclcpp::Client<fsregistration::srv::RequestListPotentialSolution2D>::SharedPtr listPotentialClient;
+    rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution2D>::SharedPtr onePotentialClient2D;
+    rclcpp::Client<fsregistration::srv::RequestListPotentialSolution2D>::SharedPtr listPotentialClient2D;
+    rclcpp::Client<fsregistration::srv::RequestListPotentialSolution3D>::SharedPtr listPotentialClient3D;
+    // rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution3D>::SharedPtr onePotentialClient3D;
     int sizeVoxelData;
 
     std::mutex *icpMutex,*ndtd2dMutex,*ndtp2dMutex,*fourierMellinMutex,*oursMutex,*featureBasedMutex,*gmmd2dMutex,*gmmp2dMutex;

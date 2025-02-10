@@ -30,13 +30,15 @@ void vertex::setRotationVertex(const Eigen::Quaterniond &rotationVertexInput) {
 }
 
 const Eigen::Matrix3d vertex::getCovarianceMatrix() const {
-    return this->covariance;
+    return this->covariance2D;
 }
 
-void vertex::setCovarianceMatrix(Eigen::Matrix3d covariancePositionInput) {
-    this->covariance = covariancePositionInput;
+void vertex::setCovarianceMatrix2D(Eigen::Matrix3d covariancePositionInput) {
+    this->covariance2D = covariancePositionInput;
 }
-
+void vertex::setCovarianceMatrix3D(Eigen::MatrixXd covariancePositionInput) {
+    this->covariance3D = covariancePositionInput;
+}
 Eigen::Matrix4d vertex::getTransformation() {
     Eigen::Matrix4d transformation;
 
@@ -109,4 +111,9 @@ void vertex::setNumberOfMarkersSeen(double numberOfMarkers){
 double vertex::getNumberOfMarkersSeen() const{
 
     return this->numberOfMarkersSeen;
+}
+
+pclMeasurement vertex::getPCLMeasurement(){
+
+    return this->pclMeasurements;
 }

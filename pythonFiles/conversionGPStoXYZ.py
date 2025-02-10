@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
@@ -28,19 +29,23 @@ class GpsToXYZNode(Node):
             self.gps_callbackCarol,
             10)
         # self.publisher1_ = self.create_publisher(PoseStamped, '/Alpha/xyz_topic', 10)
-        self.publisherAlpha_ = self.create_publisher(PoseArray, '/Alpha/xyz_topicArray', 10)
-        self.publisherBob_ = self.create_publisher(PoseArray, '/Bob/xyz_topicArray', 10)
-        self.publisherCarol_ = self.create_publisher(PoseArray, '/Carol/xyz_topicArray', 10)
+        self.publisherAlpha_ = self.create_publisher(PoseArray, '/Alpha/gt_xyz', 10)
+        self.publisherBob_ = self.create_publisher(PoseArray, '/Bob/gt_xyz', 10)
+        self.publisherCarol_ = self.create_publisher(PoseArray, '/Carol/gt_xyz', 10)
 
         self.transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:3857")
-        self.beginningPose = np.array([0.0, 0.0, 0.0])
+        self.beginningPoseAlpha = np.array([0.0, 0.0, 0.0])
+        self.beginningPoseBob = np.array([0.0, 0.0, 0.0])
+        self.beginningPoseCarol = np.array([0.0, 0.0, 0.0])
         self.poseArrayAlpha = PoseArray()
         self.poseArrayAlpha.header.frame_id = "world"
         self.poseArrayBob = PoseArray()
         self.poseArrayBob.header.frame_id = "world"
         self.poseArrayCarol = PoseArray()
         self.poseArrayCarol.header.frame_id = "world"
-        self.firstGPSMessage = True
+        self.firstGPSMessageAlpha = True
+        self.firstGPSMessageBob = True
+        self.firstGPSMessageCarol = True
 
     def gpsConversion(self, msg):
         latitude = msg.latitude
@@ -55,57 +60,60 @@ class GpsToXYZNode(Node):
     def gps_callbackAlpha(self, msg):
         x ,y,altitude = self.gpsConversion(msg)
 
-        if self.firstGPSMessage:
-            self.beginningPose = np.array([x, y, altitude])
-            self.firstGPSMessage = False
+        if self.firstGPSMessageAlpha:
+            self.beginningPoseAlpha = np.array([x, y, altitude])
+            self.firstGPSMessageAlpha = False
         else:
             point_msg = PoseStamped()
-            point_msg.pose.position.x = x-self.beginningPose[0]
-            point_msg.pose.position.y = y-self.beginningPose[1]
+            point_msg.pose.position.x = x-self.beginningPoseAlpha[0]
+            point_msg.pose.position.y = y-self.beginningPoseAlpha[1]
             point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
             point_msg.pose.orientation.w = 1.0
 
-            point_msg.header.stamp = self.get_clock().now().to_msg()
+            point_msg.header.stamp = msg.header.stamp
             point_msg.header.frame_id = "world"
 
             self.poseArrayAlpha.poses.append(point_msg.pose)
+            self.poseArrayAlpha.header.stamp = msg.header.stamp
             self.publisherAlpha_.publish(self.poseArrayAlpha)
 
     def gps_callbackBob(self, msg):
         x ,y,altitude = self.gpsConversion(msg)
 
-        if self.firstGPSMessage:
-            self.beginningPose = np.array([x, y, altitude])
-            self.firstGPSMessage = False
+        if self.firstGPSMessageBob:
+            self.beginningPoseBob = np.array([x, y, altitude])
+            self.firstGPSMessageBob = False
         else:
             point_msg = PoseStamped()
-            point_msg.pose.position.x = x-self.beginningPose[0]
-            point_msg.pose.position.y = y-self.beginningPose[1]
+            point_msg.pose.position.x = x-self.beginningPoseBob[0]
+            point_msg.pose.position.y = y-self.beginningPoseBob[1]
             point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
             point_msg.pose.orientation.w = 1.0
 
-            point_msg.header.stamp = self.get_clock().now().to_msg()
+            point_msg.header.stamp = msg.header.stamp
             point_msg.header.frame_id = "world"
 
             self.poseArrayBob.poses.append(point_msg.pose)
+            self.poseArrayBob.header.stamp = msg.header.stamp
             self.publisherBob_.publish(self.poseArrayBob)
     def gps_callbackCarol(self, msg):
         x ,y,altitude = self.gpsConversion(msg)
 
-        if self.firstGPSMessage:
-            self.beginningPose = np.array([x, y, altitude])
-            self.firstGPSMessage = False
+        if self.firstGPSMessageCarol:
+            self.beginningPoseCarol = np.array([x, y, altitude])
+            self.firstGPSMessageCarol = False
         else:
             point_msg = PoseStamped()
-            point_msg.pose.position.x = x-self.beginningPose[0]
-            point_msg.pose.position.y = y-self.beginningPose[1]
+            point_msg.pose.position.x = x-self.beginningPoseCarol[0]
+            point_msg.pose.position.y = y-self.beginningPoseCarol[1]
             point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
             point_msg.pose.orientation.w = 1.0
 
-            point_msg.header.stamp = self.get_clock().now().to_msg()
+            point_msg.header.stamp = msg.header.stamp
             point_msg.header.frame_id = "world"
 
             self.poseArrayCarol.poses.append(point_msg.pose)
+            self.poseArrayCarol.header.stamp = msg.header.stamp
             self.publisherCarol_.publish(self.poseArrayCarol)
 
 def main(args=None):

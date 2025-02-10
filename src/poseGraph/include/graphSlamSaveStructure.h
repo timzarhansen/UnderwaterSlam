@@ -32,6 +32,7 @@ class graphSlamSaveStructure {
 public:
     graphSlamSaveStructure(int degreeOfFreedom, int typeOfGraphSlam) {
         if (degreeOfFreedom == 3) {
+            // std::cout << "this shouldnt happen atm." << std::endl;
             this->degreeOfFreedom = degreeOfFreedom;
             this->typeOfGraphSlam = typeOfGraphSlam;
 
@@ -56,18 +57,23 @@ public:
                 this->typeOfGraphSlam = typeOfGraphSlam;
 
                 //adds the Prior. Makes sure that the initial position is at 0 0 0 and stays there.
-                auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(0.1, 0.1, 0.1,0.01,0.01,0.01));
+                gtsam::Vector tmpVector = gtsam::Vector(6);
+                tmpVector << 0.1, 0.1, 0.1, 0.01, 0.01, 0.01;
+
+                auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(tmpVector);
                 this->graph.addPrior(0, gtsam::Pose3(gtsam::Rot3(gtsam::Matrix3::Identity()),gtsam::Point3(0,0,0)), priorNoise);
 
                 //        this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(0.02, 0.02, 0.005));
-                this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(0.03, 0.03, 0.03,0.01,0.01,0.01));
-                this->loopClosureNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector3(1, 1, 1,0.05,0.05,0.05));
+                tmpVector << 0.03, 0.03, 0.03,0.01,0.01,0.01;
+                this->deadReckoningNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(tmpVector));
+                tmpVector << 1, 1, 1,0.05,0.05,0.05;
+                this->loopClosureNoiseModel = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector(tmpVector));
 
                 gtsam::ISAM2Params parameters;
                 parameters.relinearizeThreshold = 0.01;
                 parameters.relinearizeSkip = 1;
                 parameters.print();
-                isam = new gtsam::ISAM2(parameters);
+                this->isam = new gtsam::ISAM2(parameters);
 
             } else {
                 std::cout << "not implemented DOF: " <<degreeOfFreedom<<std::endl;

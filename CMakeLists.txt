@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+#set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_GTSAM_USE_SYSTEM_EIGEN ON)
 
 
@@ -240,5 +240,14 @@ target_link_libraries(gtSAMTest PUBLIC gtsam)
 #add_executable(readInCSV src/evaluation/readInCSVAndPublishToTopics.cpp )
 #ament_target_dependencies(readInCSV Eigen3 rclcpp tf2 ping360_sonar_msgs )
 
+install(TARGETS
+        odometryTest
+        #        guibluerov2
+        DESTINATION lib/${PROJECT_NAME}
+)
+install(PROGRAMS
+        pythonFiles/conversionGPStoXYZ.py
+        DESTINATION lib/${PROJECT_NAME}
+)
 
 ament_package()

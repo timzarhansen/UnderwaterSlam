@@ -1,0 +1,9 @@
+/odometrypublisher:
+  ros__parameters:
+    number_of_skips: 20
+    pcl_topic_name: "/Bob/velodyne_points"
+    pose_topic_name: "/Bob/poseArray"
+    gt_topic_name: "/Bob/gt_xyz"
+    time_until_save: 10 #after 5 minutes
+    which_registration: "fs3d64"
+    scan_radius_max: 35.0   

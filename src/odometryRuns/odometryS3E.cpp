@@ -3,7 +3,7 @@
 //
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-
+#include "geometry_msgs/msg/pose_array.hpp"
 // #include "ping360_sonar_msgs/msg/sonar_echo.hpp"
 #include "generalHelpfulTools.h"
 #include "slamToolsRos.h"
@@ -14,18 +14,23 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "commonbluerovmsg/srv/save_graph.hpp"
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/io/ply_io.h>
+#include <filesystem>
 // #include "pcl/conversions.h"
 #include <pcl/PCLPointCloud2.h>
+#include <pcl/registration/gicp.h>
+#include <Eigen/Dense>
 // #include "commonbluerovmsg/msg/state_robot_for_evaluation.hpp"
 
 
-
-
-#define NUMBER_OF_POINTS_DIMENSION 64
+// #define NUMBER_OF_POINTS_DIMENSION 64
+// #define MAX_DISTANCE 20
+// #define VOXEL_SIZE 0.95
 // #define DIMENSION_OF_VOXEL_DATA_FOR_MATCHING 40 // was 50 //tuhh tank 6
 // #define NUMBER_OF_POINTS_MAP 512//was 512
 // // 80 simulation ;300 valentin; 45.0 for Keller; 10.0 TUHH TANK ;15.0 Ocean ;35.0 DFKI
 // #define DIMENSION_OF_MAP 35.0
+// #define HOW_MANY_SKIPS_OF_MESSAGES 10
 //
 // #define IGNORE_DISTANCE_TO_ROBOT 1.0 // was 1.0 // TUHH 0.2
 // #define DEBUG_REGISTRATION false
@@ -44,25 +49,90 @@
 // #define SONAR_LOOKING_DOWN false
 // #define USES_GROUND_TRUTH false
 
-class rosClassSlam : public rclcpp::Node {
+class rosClassSlam : public rclcpp::Node
+{
 public:
-    rosClassSlam() : Node("ourgraphslam"), graphSaved(6, POINT_CLOUD_SAVED),
-                     scanRegistrationObject(NUMBER_OF_POINTS_DIMENSION) {
-        //we have to make sure, to get ALLL the data. Therefor we have to change that in the future.
+    rosClassSlam() : Node("odometrypublisher"), graphSaved(6, POINT_CLOUD_SAVED)
+    {
+        //Parameter Definitions
+        this->declare_parameter<int>("number_of_skips", 10);
+        this->declare_parameter<std::string>("pcl_topic_name", "/Bob/velodyne_points");
+        this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
+        this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
+        this->declare_parameter<int>("time_until_save", 1);
+        this->declare_parameter<std::string>("which_registration", "fs3d32");
+        this->declare_parameter<double>("scan_radius_max", 35.0);
+
+
+        this->which_registration = this->get_parameter("which_registration").as_string();
+        this->number_of_skips = this->get_parameter("number_of_skips").as_int();
+        this->pcl_topic_name= this->get_parameter("pcl_topic_name").as_string();
+        this->pose_topic_name= this->get_parameter("pose_topic_name").as_string();
+        this->gt_topic_name= this->get_parameter("gt_topic_name").as_string();
+        this->time_until_save= this->get_parameter("time_until_save").as_int();
+        this->scan_radius_max= this->get_parameter("scan_radius_max").as_double();
+
+
+
+        if (this->which_registration=="fs3d32") {
+            this->dimension_of_registration = 32;
+            this->voxel_size = 2*this->scan_radius_max/32;
+            this->scanRegistrationObject = new scanRegistrationClass(32);
+        }
+
+        if (this->which_registration=="fs3d64") {
+            this->dimension_of_registration = 64;
+            this->voxel_size = 2*this->scan_radius_max/64;
+            this->scanRegistrationObject= new scanRegistrationClass(64);
+        }
+
+        if (this->which_registration=="fs3d128") {
+            this->dimension_of_registration = 128;
+            this->voxel_size = 2*this->scan_radius_max/128;
+            this->scanRegistrationObject= new scanRegistrationClass(128);
+        }
+        if (this->which_registration=="fs3d32ICP") {
+            this->dimension_of_registration = 32;
+            this->voxel_size = 2*this->scan_radius_max/32;
+            this->scanRegistrationObject = new scanRegistrationClass(32);
+        }
+
+        if (this->which_registration=="fs3d64ICP") {
+            this->dimension_of_registration = 64;
+            this->voxel_size = 2*this->scan_radius_max/64;
+            this->scanRegistrationObject= new scanRegistrationClass(64);
+        }
+
+        if (this->which_registration=="fs3d128ICP") {
+            this->dimension_of_registration = 128;
+            this->voxel_size = 2*this->scan_radius_max/128;
+            this->scanRegistrationObject= new scanRegistrationClass(128);
+        }
+        if (this->which_registration=="ICP") {
+            this->dimension_of_registration = 128;
+            this->voxel_size = 2*this->scan_radius_max/128;
+            this->scanRegistrationObject= new scanRegistrationClass(128);
+        }
+
+
+
+
+
+        //we have to make sure, to get ALL the data. Therefor we have to change that in the future.
         rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(10), rmw_qos_profile_system_default);
         qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_KEEP_ALL);
         qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
-        qos.durability( rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT);
-        qos.liveliness( rmw_qos_liveliness_policy_e::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT);
+        qos.durability(rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT);
+        qos.liveliness(rmw_qos_liveliness_policy_e::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT);
         qos.deadline(rmw_time_t(RMW_DURATION_INFINITE));
-        qos.lifespan( rmw_time_t(RMW_DURATION_INFINITE));
-        qos.liveliness_lease_duration( rmw_time_t(RMW_DURATION_INFINITE));
+        qos.lifespan(rmw_time_t(RMW_DURATION_INFINITE));
+        qos.liveliness_lease_duration(rmw_time_t(RMW_DURATION_INFINITE));
         qos.avoid_ros_namespace_conventions(false);
 
         this->callback_group_subscriber1_ = this->create_callback_group(
-                rclcpp::CallbackGroupType::MutuallyExclusive);
+            rclcpp::CallbackGroupType::MutuallyExclusive);
         this->callback_group_subscriber2_ = this->create_callback_group(
-                rclcpp::CallbackGroupType::MutuallyExclusive);
+            rclcpp::CallbackGroupType::MutuallyExclusive);
         auto sub1_opt = rclcpp::SubscriptionOptions();
         sub1_opt.callback_group = callback_group_subscriber1_;
         auto sub2_opt = rclcpp::SubscriptionOptions();
@@ -70,23 +140,26 @@ public:
 
 
         this->subscriberVelodyne = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-                "sonar/intensity", qos,
-                std::bind(&rosClassSlam::valodyneCallback,
-                          this, std::placeholders::_1), sub2_opt);
+            this->pcl_topic_name, qos,
+            std::bind(&rosClassSlam::valodyneCallback,
+                      this, std::placeholders::_1), sub1_opt);
+        this->subscriberGroundTruth = this->create_subscription<geometry_msgs::msg::PoseArray>(
+            this->gt_topic_name, qos,
+            std::bind(&rosClassSlam::groundTruthGPSEvaluationCallback,
+                      this, std::placeholders::_1), sub2_opt);
+        // this->serviceSaveGraph = this->create_service<commonbluerovmsg::srv::SaveGraph>("saveGraphOfSLAM",
+        //                                                                                 std::bind(
+        //                                                                                         &rosClassSlam::saveGraph,
+        //                                                                                         this,
+        //                                                                                         std::placeholders::_1,
+        //                                                                                         std::placeholders::_2));
 
-        this->serviceSaveGraph = this->create_service<commonbluerovmsg::srv::SaveGraph>("saveGraphOfSLAM",
-                                                                                        std::bind(
-                                                                                                &rosClassSlam::saveGraph,
-                                                                                                this,
-                                                                                                std::placeholders::_1,
-                                                                                                std::placeholders::_2));
+        this->publisherPoseOdometry = this->create_publisher<geometry_msgs::msg::PoseArray>(
+            this->pose_topic_name, qos);
 
-        this->publisherPoseSLAM = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-                "slamEndPose", qos);
-
-        std::chrono::duration<double> my_timer_duration = std::chrono::duration<double>(5.0);
+        std::chrono::duration<double> my_timer_duration = std::chrono::duration<double>(100.0);
         this->timer_ = this->create_wall_timer(
-                my_timer_duration, std::bind(&rosClassSlam::createMapOfAllScans, this));
+            my_timer_duration, std::bind(&rosClassSlam::timerFunction, this));
 
 
         this->sigmaScaling = 1.0;
@@ -96,15 +169,29 @@ public:
         this->numberOfTimesFirstScan = 0;
 
         this->maxTimeOptimization = 1.0;
+        this->numberOfScans = 0;
+        this->time_last_pointcloud = std::chrono::steady_clock::now();
+        std::string whichRobot;
+        if (this->pcl_topic_name=="/Alpha/velodyne_points") {
+            whichRobot = "Alpha";
+        }
+        if (this->pcl_topic_name=="/Bob/velodyne_points") {
+            whichRobot = "Bob";
+        }
+        if (this->pcl_topic_name=="/Carol/velodyne_points") {
+            whichRobot = "Carol";
+        }
+        this->folderForSaving = std::string(this->which_registration+"_"+std::to_string(this->number_of_skips)+"_"+std::to_string(this->scan_radius_max)+"_"+whichRobot);
+        std::cout << "endet initilization" << std::endl;
     }
-
 
 private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscriberVelodyne;
+    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr subscriberGroundTruth;
 
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisherPoseSLAM;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr publisherPoseOdometry;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisherPointcloudMap;
-    rclcpp::Service<commonbluerovmsg::srv::SaveGraph>::SharedPtr serviceSaveGraph;
+    // rclcpp::Service<commonbluerovmsg::srv::SaveGraph>::SharedPtr serviceSaveGraph;
 
     rclcpp::CallbackGroup::SharedPtr callback_group_subscriber1_;
     rclcpp::CallbackGroup::SharedPtr callback_group_subscriber2_;
@@ -126,84 +213,208 @@ private:
     double sigmaScaling;
 
     graphSlamSaveStructure graphSaved;
-    scanRegistrationClass scanRegistrationObject;
+    scanRegistrationClass* scanRegistrationObject;
     bool firstSonarInput, firstCompleteSonarScan, saveGraphStructure;
     std::string saveStringGraph;
     double maxTimeOptimization;
+    int numberOfScans;
     int numberOfTimesFirstScan;
+    // parameters
+    int dimension_of_registration;
+    int number_of_skips;
+    std::string pcl_topic_name;
+    std::string pose_topic_name;
+    std::string gt_topic_name;
+    double time_until_save;
+    std::string which_registration;
+    double scan_radius_max;
+    double voxel_size;
+    std::chrono::steady_clock::time_point time_last_pointcloud;
+    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::string folderForSaving;
 
 
-    void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+
+    void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    {
+
+        // std::cout << "valodyneCallback Started" << std::endl;
         std::lock_guard<std::mutex> lock(this->odometryMutex);
+        this->time_last_pointcloud = std::chrono::steady_clock::now();
+        // std::cout << "mutex Started" << std::endl;
         pclMeasurement PCLTMP;
 
         PCLTMP.time = rclcpp::Time(msg->header.stamp).seconds();
+        std::cout << "PCLTMP.time: " << PCLTMP.time <<std::endl;
+        pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
+        // std::cout << "2" << std::endl;
+        pcl::fromROSMsg(*msg, cloudIncoming);
+        // std::cout << "converted pcl to ROS " << std::endl;
 
-        pcl::PointCloud<pcl::PointXYZ> cloudPtr;
-
-        pcl::fromROSMsg(*msg, cloudPtr);
 
         // pcl_conversions::toPCL(*msgPtr, cloudPtr);
-        PCLTMP.pointcloud = cloudPtr;
+        PCLTMP.pointcloud = cloudIncoming;
 
+        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_ply.ply", PCLTMP.pointcloud);
+        // pcl::io::savePCDFileASCII ("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_pcd.pcd", cloudPtr);
 
-        if (this->firstSonarInput) {
-
+        // std::cout << "First Sonar Input" << std::endl;
+        if (this->firstSonarInput)
+        {
             this->graphSaved.addVertexPCL(0, Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond(1, 0, 0, 0),
-                                       Eigen::Matrix3d::Zero(), PCLTMP, rclcpp::Time(msg->header.stamp).seconds(),
-                                       FIRST_ENTRY);
+                                          Eigen::Matrix3d::Zero(), PCLTMP, rclcpp::Time(msg->header.stamp).seconds(),
+                                          FIRST_ENTRY);
+            this->graphSaved.print();
             this->firstSonarInput = false;
+            sleep(1);
+            this->saveCurrentGTPosition();
             return;
         }
 
+        this->numberOfScans++;
+        if (this->numberOfScans % this->number_of_skips != 0) {
+            return;
+        }
+        std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
+        // double* voxelData1;
+        // double* voxelData2;
+        // voxelData1 = (double*)malloc(
+        //     sizeof(double) * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION);
+        // voxelData2 = (double*)malloc(
+        //     sizeof(double) * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION);
+        double* voxelData1;
+        double* voxelData2;
+        voxelData1 = (double*)calloc(
+            this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+            sizeof(double));
+        voxelData2 = (double*)calloc(
+            this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+            sizeof(double));
+        pcl::PointXYZ shift = pcl::PointXYZ(0, 0, 0);
+        // double voxelSize = (double)DIMENSION_OF_MAP / NUMBER_OF_POINTS_DIMENSION;
+
+        pcl::PointCloud<pcl::PointXYZ> pclLastScan;
+        pclLastScan = this->graphSaved.getVertexList()->back().getPCLMeasurement().pointcloud;
+        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_1_ply.ply", pclLastScan);
+        std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
+        std::cout << "size First PCL: "<< pclLastScan.size() << std::endl;
+        slamToolsRos::convertPointToVoxel(pclLastScan, voxelData1, this->dimension_of_registration,
+                                          this->voxel_size, this->voxel_size, this->voxel_size, shift);
 
 
+        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_2_ply.ply", cloudIncoming);
+        std::cout << "size Second PCL: "<< cloudIncoming.size() << std::endl;
+        slamToolsRos::convertPointToVoxel(cloudIncoming, voxelData2, this->dimension_of_registration,
+                                          this->voxel_size, this->voxel_size, this->voxel_size, shift);
+
+        // std::ofstream voxel1,voxel2;
+        // voxel1.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel1Before.csv");
+        // voxel2.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel2Before.csv");
+        // //save errors angle
+        // for (int i = 0; i < NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION; i++) {
+        //     voxel1 << voxelData1[i];//time
+        //     voxel1 << "\n";//error
+        //     voxel2 << voxelData2[i];//time
+        //     voxel2 << "\n";//error
+        // }
+        // voxel1.close();
+        // voxel2.close();
+        // std::cout << "after pcl Conversion " << std::endl;
+        double maximumVoxelData = 1;
         //Compute difference based on Registration
+        Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+        Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+        double timeToCalculate = 0;
+        // std::cout << "starting Registration: " << std::endl;
+        std::vector<fsregistration::msg::PotentialSolution3D> potentialSolutionsList = this->scanRegistrationObject->
+            registrationOfTwoVoxels3DSOFFTAllSoluations(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
+                                                        initialGuess,
+                                                        covarianceMatrix, this->voxel_size, timeToCalculate);
+        // std::cout << "finished Registration: " << std::endl;
+        //fine from list the right Solution and the do ICP afterwards.
 
-        edge differenceOfEdge =  ;
+        double highestPeak = 0;
+        Eigen::Matrix4d currentRegistrationEstimation = Eigen::Matrix4d::Identity();
+        for (auto& estimatedTransformation : potentialSolutionsList)
+        {
+            //rotation
+
+            if (estimatedTransformation.transformation_peak_height > highestPeak)
+            {
+                Eigen::Quaterniond rotation(estimatedTransformation.resulting_transformation.orientation.w,
+                                            estimatedTransformation.resulting_transformation.orientation.x,
+                                            estimatedTransformation.resulting_transformation.orientation.y,
+                                            estimatedTransformation.resulting_transformation.orientation.z);
+
+                currentRegistrationEstimation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
+                currentRegistrationEstimation.block<3, 1>(0, 3) = Eigen::Vector3d(
+                    estimatedTransformation.resulting_transformation.position.x,
+                    estimatedTransformation.resulting_transformation.position.y,
+                    estimatedTransformation.resulting_transformation.position.z);
+                // std::cout << estimatedTransformation.potentialRotation.angle << std::endl;
+                highestPeak = estimatedTransformation.transformation_peak_height;
+            }
+            //translation
+        }
+        std::cout << "our match" << std::endl;
+        std::cout << currentRegistrationEstimation << std::endl;
+
+
+        // edge differenceOfEdge = ;
 
         Eigen::Matrix4d tmpTransformation = this->graphSaved.getVertexList()->back().getTransformation();
-        tmpTransformation = tmpTransformation * differenceOfEdge.getTransformation();
+        tmpTransformation = tmpTransformation * currentRegistrationEstimation;
         Eigen::Vector3d pos = tmpTransformation.block<3, 1>(0, 3);
         Eigen::Matrix3d rotM = tmpTransformation.block<3, 3>(0, 0);
         Eigen::Quaterniond rot(rotM);
 
 
         this->graphSaved.addVertexPCL(this->graphSaved.getVertexList()->back().getKey() + 1, pos, rot,
-                                   this->graphSaved.getVertexList()->back().getCovarianceMatrix(),
-                                   PCLTMP,
-                                   rclcpp::Time(msg->header.stamp).seconds(),
-                                   POINT_CLOUD_SAVED);
-
-
-        Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+                                      this->graphSaved.getVertexList()->back().getCovarianceMatrix(),
+                                      PCLTMP,
+                                      rclcpp::Time(msg->header.stamp).seconds(),
+                                      POINT_CLOUD_SAVED);
+        // std::cout << "added vertex to Graph" << std::endl;
+        Eigen::Vector3d currentRegistrationEstimationTranslation;
+        Eigen::Quaterniond currentRegistrationEstimationRotation;
+        generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(currentRegistrationEstimationTranslation,
+                                                                     currentRegistrationEstimationRotation,
+                                                                     currentRegistrationEstimation);
+        // Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+        //overwrite the covariance matrix. at some point not necessary
         covarianceMatrix(0, 0) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(1, 1) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(2, 2) = INTEGRATED_NOISE_RPY;
         this->graphSaved.addEdge(this->graphSaved.getVertexList()->back().getKey() - 1,
                                  this->graphSaved.getVertexList()->back().getKey(),
-                                 differenceOfEdge.getPositionDifference(), differenceOfEdge.getRotationDifference(),
+                                 currentRegistrationEstimationTranslation, currentRegistrationEstimationRotation,
                                  covarianceMatrix, INTEGRATED_POSE);
 
-            ////////////// look for loop closure  //////////////
-            // slamToolsRos::loopDetectionByClosestPath(this->graphSaved, this->scanRegistrationObject,
-            //                                          NUMBER_OF_POINTS_DIMENSION, IGNORE_DISTANCE_TO_ROBOT,
-            //                                          DIMENSION_OF_VOXEL_DATA_FOR_MATCHING, DEBUG_REGISTRATION,
-            //                                          USE_INITIAL_TRANSLATION_LOOP_CLOSURE, 250, 500,
-            //                                          THRESHOLD_FOR_TRANSLATION_MATCHING, MAXIMUM_LOOP_CLOSURE_DISTANCE);
+        this->saveCurrentGTPosition();
+        // std::cout << "added edge to Graph" << std::endl;
+        ////////////// look for loop closure  //////////////
+        // slamToolsRos::loopDetectionByClosestPath(this->graphSaved, this->scanRegistrationObject,
+        //                                          NUMBER_OF_POINTS_DIMENSION, IGNORE_DISTANCE_TO_ROBOT,
+        //                                          DIMENSION_OF_VOXEL_DATA_FOR_MATCHING, DEBUG_REGISTRATION,
+        //                                          USE_INITIAL_TRANSLATION_LOOP_CLOSURE, 250, 500,
+        //                                          THRESHOLD_FOR_TRANSLATION_MATCHING, MAXIMUM_LOOP_CLOSURE_DISTANCE);
 
 
-
-            this->graphSaved.isam2OptimizeGraph(true, 2);
-//        this->graphSaved.isam2OptimizeGraph(true,1);
+        this->graphSaved.isam2OptimizeGraph(true, 1);
+        //        this->graphSaved.isam2OptimizeGraph(true,1);
+        std::cout << "optimize Stuff" << std::endl;
         // visualize graph
-
-
+        geometry_msgs::msg::PoseArray poseArrayToPublish = getFullPoseArrayOfGraph();
+        this->publisherPoseOdometry->publish(poseArrayToPublish);
 
         // slamToolsRos::visualizeCurrentPoseGraph(this->graphSaved, this->publisherSonarEcho,
         //                                         this->publisherMarkerArray, this->sigmaScaling,
         //                                         this->publisherPoseSLAM, this->publisherMarkerArrayLoopClosures,this->publisherEKF);
+        free(voxelData1);
+        free(voxelData2);
 
+
+        std::cout << "published everything " << std::endl;
     }
 
     // bool saveGraph(const std::shared_ptr<commonbluerovmsg::srv::SaveGraph::Request> req,
@@ -254,116 +465,298 @@ private:
     //     return true;
     // }
 
-    void groundTruthGPSEvaluationCallback(const commonbluerovmsg::msg::StateRobotForEvaluation::SharedPtr msg) {
+    void groundTruthGPSEvaluationCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
+    {
+        // std::cout << "Ground Truth getting Callback before Mutex" << std::endl;
         std::lock_guard<std::mutex> lock(this->groundTruthMutex);
+        // std::cout << "Ground Truth getting Callback after Mutex" << std::endl;
+        auto currentGTPose = msg->poses.back();
+        Eigen::Quaterniond currentRotation(currentGTPose.orientation.w, currentGTPose.orientation.x,
+                                           currentGTPose.orientation.y, currentGTPose.orientation.z);
+        Eigen::Vector3d currentTranslation(currentGTPose.position.x, currentGTPose.position.y,
+                                           currentGTPose.position.z);
+        Eigen::Matrix4d tmpMatrix = generalHelpfulTools::getTransformationMatrix(currentTranslation, currentRotation);
         //first time? calc current Position
-        Eigen::Matrix4d tmpMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(msg->roll, msg->pitch,
-                                                                                        msg->yaw);
-        tmpMatrix(0, 3) = msg->x_position;
-        tmpMatrix(1, 3) = msg->y_position;
-        tmpMatrix(2, 3) = msg->z_position;
+        // Eigen::Matrix4d tmpMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(msg->roll, msg->pitch,msg->yaw);
+
+        // tmpMatrix(0, 3) = msg->x_position;
+        // tmpMatrix(1, 3) = msg->y_position;
+        // tmpMatrix(2, 3) = msg->z_position;
+
         transformationStamped tmpValue;
         tmpValue.transformation = tmpMatrix;
-        tmpValue.timeStamp = msg->timestamp;
+        // tmpValue.timeStamp = std::chrono::microseconds(msg->header.stamp.nanosec) * 1000;
+        // auto currentTimeOfMessage = std::chrono::microseconds(msg->header.stamp.nanosec) * 1000;
+        tmpValue.timeStamp = rclcpp::Time(msg->header.stamp).seconds();
+        // std::cout << "adding stuff to deque: " << std::endl;
+
         this->currentPositionGTDeque.push_back(tmpValue);
+        // std::cout << tmpValue.transformation << std::endl;
+        // std::cout << tmpValue.timeStamp << std::endl;
+        // std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
     }
 
-    Eigen::Matrix4d getCurrentGTPosition() {
+    // Eigen::Matrix4d getCurrentGTPosition()
+    // {
+    //     std::lock_guard<std::mutex> lock(this->groundTruthMutex);
+    //     return this->currentGTPosition;
+    // }
+
+
+    void saveCurrentGTPosition()
+    {
         std::lock_guard<std::mutex> lock(this->groundTruthMutex);
-        return this->currentGTPosition;
+
+        std::cout <<  std::setprecision(19);
+        if (this->currentPositionGTDeque.empty()) {
+            std::cout << "GT array empty" << std::endl;
+            return;
+        }
+
+        auto vertexList = this->graphSaved.getVertexList();
+        double currentTimeStampOfInterest = vertexList->back().getTimeStamp();
+        int i = std::upper_bound(this->currentPositionGTDeque.begin(), this->currentPositionGTDeque.end(), currentTimeStampOfInterest,
+                                 [](double ts, const transformationStamped& v) { return ts < v.timeStamp; })
+                - this->currentPositionGTDeque.begin();
+
+        // if 0 or max then just take that  this->currentPositionGTDeque.begin()
+        // if (i == 0 || i == this->currentPositionGTDeque.size()) break;
+
+        vertexList->back().setGroundTruthTransformation(this->currentPositionGTDeque[i].transformation);
+        // std::cout << "timestep of interest: " << currentTimeStampOfInterest<< std::endl;
+        // std::cout << "timestep i: " << this->currentPositionGTDeque[i].timeStamp<< std::endl;
+        // if (i > 0) {
+            // std::cout << "timestep i-1: " << this->currentPositionGTDeque[i-1].timeStamp<< std::endl;
+        // }
+        // if (i < this->currentPositionGTDeque.size()-1) {
+            // std::cout << "timestep i+1: " << this->currentPositionGTDeque[i+1].timeStamp<< std::endl;
+        // }
+        // Remove processed entries
+        // for (int k = 0; k < j; ++k) {
+        //     this->currentPositionGTDeque.pop_front();
+        // }
+
+        // Check if there are any entries left and they are within the 5-second window
+        while (!this->currentPositionGTDeque.empty() && (currentTimeStampOfInterest - this->currentPositionGTDeque.front().timeStamp > 5.0)) {
+            this->currentPositionGTDeque.pop_front();
+        }
+
+        std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
+        std::cout << "done" << std::endl;
     }
 
-    void saveCurrentGTPosition() {
-        std::lock_guard<std::mutex> lock(this->groundTruthMutex);
-        while (!this->currentPositionGTDeque.empty()) {
-            double currentTimeStampOfInterest = this->currentPositionGTDeque[0].timeStamp;
-//            std::cout << currentTimeStampOfInterest << std::endl;
-            int i = this->graphSaved.getVertexList()->size() - 1;
-            while (this->graphSaved.getVertexList()->at(i).getTimeStamp() >= currentTimeStampOfInterest) {
-                i--;
-                if (i == -1) {
-                    break;
-                }
-            }
-            i++;
-            if (i == this->graphSaved.getVertexList()->size()) {
-                break;
-            }
-//            if (i == 0) {
-//                break;
-//            }
-
-//            std::cout << this->graphSaved.getVertexList()->at(i).getTimeStamp() << std::endl;
-//            std::cout << currentTimeStampOfInterest << std::endl;
 
 
 
-            //sort in
-            int j = 0;
-            while (this->graphSaved.getVertexList()->at(i).getTimeStamp() >=
-                   this->currentPositionGTDeque[j].timeStamp) {
-                j++;
-                if (j == this->currentPositionGTDeque.size()) {
-                    break;
-                }
-            }
-            if (j == this->currentPositionGTDeque.size()) {
-                break;
-            }
-//            std::cout << this->graphSaved.getVertexList()->at(i).getTimeStamp() << std::endl;
-//            std::cout << this->currentPositionGTDeque[j].timeStamp << std::endl;
-            this->graphSaved.getVertexList()->at(i).setGroundTruthTransformation(
-                    this->currentPositionGTDeque[j].transformation);
-
-
-            for (int k = 0; k < j + 1; k++) {
-                this->currentPositionGTDeque.pop_front();
-            }
+    // void gicpRegistration(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_src,
+    //                       const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_tgt,
+    //                       const Eigen::Matrix4d& init_guess,
+    //                       pcl::PointCloud<pcl::PointXYZ>::Ptr& result_cloud,
+    //                       Eigen::Matrix4d& transformation_matrix) {
+    //     Eigen::Isometry3d isometry_guess = Eigen::Isometry3d(init_guess.block<3, 3>(0, 0)).rotation() *
+    //                                        Eigen::Translation3d(init_guess.block<3, 1>(0, 3));
+    //
+    //     pcl::registration::GenericICP<pcl::PointXYZ, pcl::PointXYZ> gicp;
+    //     gicp.setMaximumIterations(30);
+    //     gicp.setTransformationEpsilon(1e-6);
+    //     gicp.setRotationEpsilon(1e-6);
+    //     gicp.setTransForm(isometry_guess);
+    //
+    //     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_src_temp(new pcl::PointCloud<pcl::PointXYZ>);
+    //     *cloud_src_temp = *cloud_src;
+    //
+    //     gicp.registerCloud(cloud_src_temp, cloud_tgt);
+    //
+    //     transformation_matrix = isometry_guess.cast<double>();
+    //     result_cloud = cloud_src_temp;
+    // }
 
 
 
 
-//            this->currentPositionGTDeque.pop_front();
+    // void saveCurrentGTPosition()
+    // {
+    //     std::cout <<  std::setprecision(19);
+    //     // std::cout << "adding GT to Graph" << std::endl;
+    //     std::lock_guard<std::mutex> lock(this->groundTruthMutex);
+    //     std::cout << "adding GT to Graph after Mutex" << std::endl;
+    //     std::cout << this->currentPositionGTDeque.empty() << std::endl;
+    //     if (!this->currentPositionGTDeque.empty()) {
+    //         std::cout << this->currentPositionGTDeque.size() << std::endl;
+    //         std::cout << "vertex back Timestamp: " << this->graphSaved.getVertexList()->back().getTimeStamp() << std::endl;
+    //         std::cout << "lastPos GT: " << this->currentPositionGTDeque.back().timeStamp << std::endl;
+    //         std::cout << "firstPos GT: " << this->currentPositionGTDeque[0].timeStamp << std::endl;
+    //     }
+    //
+    //     while (!this->currentPositionGTDeque.empty())
+    //     {
+    //         double currentTimeStampOfInterest = this->currentPositionGTDeque[0].timeStamp;
+    //         std::cout << "currentTimeStampOfInterest: " << currentTimeStampOfInterest<<std::endl;
+    //         int i = this->graphSaved.getVertexList()->size() - 1;
+    //         while (this->graphSaved.getVertexList()->at(i).getTimeStamp() >= currentTimeStampOfInterest)
+    //         {
+    //             i--;
+    //             if (i == -1)
+    //             {
+    //                 break;
+    //             }
+    //         }
+    //         i++;
+    //         if (i == this->graphSaved.getVertexList()->size())
+    //         {
+    //             break;
+    //         }
+    //         //            if (i == 0) {
+    //         //                break;
+    //         //            }
+    //
+    //         std::cout << this->graphSaved.getVertexList()->at(i).getTimeStamp() << std::endl;
+    //         std::cout << currentTimeStampOfInterest << std::endl;
+    //
+    //
+    //         //sort in
+    //         int j = 0;
+    //         while (this->graphSaved.getVertexList()->at(i).getTimeStamp() >=
+    //             this->currentPositionGTDeque[j].timeStamp)
+    //         {
+    //             j++;
+    //             if (j == this->currentPositionGTDeque.size())
+    //             {
+    //                 break;
+    //             }
+    //         }
+    //         if (j == this->currentPositionGTDeque.size())
+    //         {
+    //             break;
+    //         }
+    //         std::cout << "setting gt transformation:" << std::endl;
+    //         std::cout << this->graphSaved.getVertexList()->at(i).getTimeStamp() << std::endl;
+    //         std::cout << this->currentPositionGTDeque[j].timeStamp << std::endl;
+    //         this->graphSaved.getVertexList()->at(i).setGroundTruthTransformation(
+    //             this->currentPositionGTDeque[j].transformation);
+    //
+    //         int runningParameter = j-1;
+    //         if (runningParameter>0) {
+    //             for (int k = 0; k < runningParameter; k++)
+    //             {
+    //                 this->currentPositionGTDeque.pop_front();
+    //             }
+    //         }
+    //         //            this->currentPositionGTDeque.pop_front();
+    //     }
+    //     std::cout << "done" << std::endl;
+    // }
+
+    // void createMapAndSaveToFile() {
+    //     std::vector<pclValues> dataSet;
+    //     double maximumIntensity = slamToolsRos::getDatasetFromGraphForPointcloudMap(dataSet, this->graphSaved,
+    //                                                                       this->odometryMutex);
+    //
+    //     for (int currentPosition = 0;
+    //          currentPosition < dataSet.size(); currentPosition++) {
+    //
+    //         // Take Dataset and compute one big Pointcloud that gets published(slow but should work for now)
+    //
+    //
+    //          }
+    // }
+
+    void timerFunction() {
+
+        // this->time_last_pointcloud = std::chrono::steady_clock::now();
+        auto currentTime = std::chrono::steady_clock::now();
+        double timeToCalculate = std::chrono::duration_cast<std::chrono::seconds>(currentTime - this->time_last_pointcloud).count();
+        std::cout << "Timing function called: " << timeToCalculate << " ___ " << this->time_until_save*60 << std::endl;
+        if (timeToCalculate>this->time_until_save*60) {
+            saveFullPoseArrayOfGraph();
         }
 
     }
 
-    void createMapAndSaveToFile() {
-        std::vector<pclValues> dataSet;
-        double maximumIntensity = slamToolsRos::getDatasetFromGraphForPointcloudMap(dataSet, this->graphSaved,
-                                                                          this->odometryMutex);
-
-        for (int currentPosition = 0;
-             currentPosition < dataSet.size(); currentPosition++) {
-
-            // Take Dataset and compute one big Pointcloud that gets published(slow but should work for now)
-
-
-             }
-    }
-
-
 public:
+    geometry_msgs::msg::PoseArray getFullPoseArrayOfGraph()
+    {
+        // std::cout << " starting getting dataset "<<std::endl;
+        std::vector<Eigen::Matrix4d> dataSet;
 
-    void createMapOfAllScans() {
-        std::vector<pclValues> dataSet;
-        double maximumIntensity = slamToolsRos::getDatasetFromGraphForPointcloudMap(dataSet, this->graphSaved,
-                                                                          this->odometryMutex);
+        slamToolsRos::getDatasetFromGraphforPoseArray(dataSet, this->graphSaved,
+            this->odometryMutex);
+        // std::cout << " got dataset "<<std::endl;
+        geometry_msgs::msg::PoseArray resultPoseArray;
+        resultPoseArray.header.stamp = this->get_clock()->now();
+        resultPoseArray.header.frame_id = "world";
 
         for (int currentPosition = 0;
-             currentPosition < dataSet.size(); currentPosition++) {
-
+             currentPosition < dataSet.size(); currentPosition++)
+        {
             // Take Dataset and compute one big Pointcloud that gets published(slow but should work for now)
+            geometry_msgs::msg::Pose currentPose;
+            Eigen::Vector3d pos;
+            Eigen::Quaterniond rot;
+            generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(pos,rot,dataSet[currentPosition]);
+            currentPose.position.x = pos(0);
+            currentPose.position.y = pos(1);
+            currentPose.position.z = pos(2);
+            currentPose.orientation.w = rot.w();
+            currentPose.orientation.x = rot.x();
+            currentPose.orientation.y = rot.y();
+            currentPose.orientation.z = rot.z();
 
-
-             }
+            resultPoseArray.poses.push_back(currentPose);
+        }
+        return resultPoseArray;
     }
 
+    void saveFullPoseArrayOfGraph() {
+        // std::cout << " starting getting dataset "<<std::endl;
+        std::vector<Eigen::Matrix4d> poseDataSet;
 
+        slamToolsRos::getDatasetFromGraphforPoseArray(poseDataSet, this->graphSaved,
+            this->odometryMutex);
+
+
+        std::vector<Eigen::Matrix4d> gtDataSet;
+
+        slamToolsRos::getDatasetFromGraphforGroundTruthArray(gtDataSet, this->graphSaved,
+            this->odometryMutex);
+        std::cout << "this->folderForSaving: "<< this->folderForSaving << std::endl;
+        std::filesystem::create_directory("/home/tim-external/dataFolder/odometryResults/"+this->folderForSaving);
+        std::ofstream myFile1;
+        myFile1.open("/home/tim-external/dataFolder/odometryResults/"+this->folderForSaving+"/gt.csv");
+        for (int i = 0; i<gtDataSet.size(); i++) {
+
+            for (int j = 0; j < 4; j++) {
+                for (int k = 0; k < 4; k++) {
+                    myFile1 << gtDataSet[i](j, k) << ",";//number of possible rotations
+                }
+                myFile1 << "\n";
+            }
+        }
+        myFile1.close();
+
+        std::ofstream myFile2;
+        myFile2.open("/home/tim-external/dataFolder/odometryResults/"+this->folderForSaving+"/poses.csv");
+        for (int i = 0; i<poseDataSet.size(); i++) {
+
+            for (int j = 0; j < 4; j++) {
+                for (int k = 0; k < 4; k++) {
+                    myFile2 << poseDataSet[i](j, k) << ",";//number of possible rotations
+                }
+                myFile2 << "\n";
+            }
+        }
+        myFile2.close();
+
+
+
+        exit(1);
+    }
 };
 
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
+
 
     rclcpp::init(argc, argv);
     auto node = std::make_shared<rosClassSlam>();
