@@ -515,7 +515,7 @@ private:
     {
         std::lock_guard<std::mutex> lock(this->groundTruthMutex);
 
-        std::cout <<  std::setprecision(19);
+//        std::cout <<  std::setprecision(19);
         if (this->currentPositionGTDeque.empty()) {
             std::cout << "GT array empty" << std::endl;
             return;
