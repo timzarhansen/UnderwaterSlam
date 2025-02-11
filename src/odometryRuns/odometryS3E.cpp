@@ -275,6 +275,7 @@ private:
             this->firstSonarInput = false;
             sleep(1);
             this->saveCurrentGTPosition();
+            std::cout << "Saving GT position first time Done" << std::endl;
             return;
         }
 
