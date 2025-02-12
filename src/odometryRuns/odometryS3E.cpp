@@ -150,7 +150,7 @@ public:
             this->pcl_topic_name, qos,
             std::bind(&rosClassSlam::valodyneCallback,
                       this, std::placeholders::_1), sub1_opt);
-        this->subscriberGroundTruth = this->create_subscription<geometry_msgs::msg::PoseArray>(
+        this->subscriberGroundTruth = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             this->gt_topic_name, qos,
             std::bind(&rosClassSlam::groundTruthGPSEvaluationCallback,
                       this, std::placeholders::_1), sub2_opt);
@@ -194,7 +194,7 @@ public:
 
 private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subscriberVelodyne;
-    rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr subscriberGroundTruth;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr subscriberGroundTruth;
 
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr publisherPoseOdometry;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisherPointcloudMap;
@@ -283,7 +283,7 @@ private:
         if (this->numberOfScans % this->number_of_skips != 0) {
             return;
         }
-        std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
+        // std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
         // double* voxelData1;
         // double* voxelData2;
         // voxelData1 = (double*)malloc(
@@ -304,14 +304,14 @@ private:
         pcl::PointCloud<pcl::PointXYZ> pclLastScan;
         pclLastScan = this->graphSaved.getVertexList()->back().getPCLMeasurement().pointcloud;
         // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_1_ply.ply", pclLastScan);
-        std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
-        std::cout << "size First PCL: "<< pclLastScan.size() << std::endl;
+        // std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
+        // std::cout << "size First PCL: "<< pclLastScan.size() << std::endl;
         slamToolsRos::convertPointToVoxel(pclLastScan, voxelData1, this->dimension_of_registration,
                                           this->voxel_size, this->voxel_size, this->voxel_size, shift);
 
 
         // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_2_ply.ply", cloudIncoming);
-        std::cout << "size Second PCL: "<< cloudIncoming.size() << std::endl;
+        // std::cout << "size Second PCL: "<< cloudIncoming.size() << std::endl;
         slamToolsRos::convertPointToVoxel(cloudIncoming, voxelData2, this->dimension_of_registration,
                                           this->voxel_size, this->voxel_size, this->voxel_size, shift);
 
@@ -397,7 +397,7 @@ private:
                                  this->graphSaved.getVertexList()->back().getKey(),
                                  currentRegistrationEstimationTranslation, currentRegistrationEstimationRotation,
                                  covarianceMatrix, INTEGRATED_POSE);
-
+        std::cout << "save GT Pose" << std::endl;
         this->saveCurrentGTPosition();
         // std::cout << "added edge to Graph" << std::endl;
         ////////////// look for loop closure  //////////////
@@ -473,16 +473,16 @@ private:
     //     return true;
     // }
 
-    void groundTruthGPSEvaluationCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
+    void groundTruthGPSEvaluationCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
         // std::cout << "Ground Truth getting Callback before Mutex" << std::endl;
         std::lock_guard<std::mutex> lock(this->groundTruthMutex);
         // std::cout << "Ground Truth getting Callback after Mutex" << std::endl;
-        auto currentGTPose = msg->poses.back();
-        Eigen::Quaterniond currentRotation(currentGTPose.orientation.w, currentGTPose.orientation.x,
-                                           currentGTPose.orientation.y, currentGTPose.orientation.z);
-        Eigen::Vector3d currentTranslation(currentGTPose.position.x, currentGTPose.position.y,
-                                           currentGTPose.position.z);
+        // auto currentGTPose = msg->poses.back();
+        Eigen::Quaterniond currentRotation(msg->pose.orientation.w, msg->pose.orientation.x,
+                                           msg->pose.orientation.y, msg->pose.orientation.z);
+        Eigen::Vector3d currentTranslation(msg->pose.position.x, msg->pose.position.y,
+                                           msg->pose.position.z);
         Eigen::Matrix4d tmpMatrix = generalHelpfulTools::getTransformationMatrix(currentTranslation, currentRotation);
         //first time? calc current Position
         // Eigen::Matrix4d tmpMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(msg->roll, msg->pitch,msg->yaw);
@@ -499,9 +499,9 @@ private:
         // std::cout << "adding stuff to deque: " << std::endl;
 
         this->currentPositionGTDeque.push_back(tmpValue);
-        // std::cout << tmpValue.transformation << std::endl;
-        // std::cout << tmpValue.timeStamp << std::endl;
-        // std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
+        std::cout << tmpValue.transformation << std::endl;
+        std::cout << tmpValue.timeStamp << std::endl;
+        std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
     }
 
     // Eigen::Matrix4d getCurrentGTPosition()
@@ -511,11 +511,10 @@ private:
     // }
 
 
-    void saveCurrentGTPosition()
-    {
+    void saveCurrentGTPosition() {
         std::lock_guard<std::mutex> lock(this->groundTruthMutex);
 
-//        std::cout <<  std::setprecision(19);
+        std::cout <<  std::setprecision(19);
         if (this->currentPositionGTDeque.empty()) {
             std::cout << "GT array empty" << std::endl;
             return;
@@ -523,16 +522,30 @@ private:
 
         auto vertexList = this->graphSaved.getVertexList();
         double currentTimeStampOfInterest = vertexList->back().getTimeStamp();
-        int i = std::upper_bound(this->currentPositionGTDeque.begin(), this->currentPositionGTDeque.end(), currentTimeStampOfInterest,
-                                 [](double ts, const transformationStamped& v) { return ts < v.timeStamp; })
-                - this->currentPositionGTDeque.begin();
+        // auto it = std::upper_bound(this->currentPositionGTDeque.begin(), this->currentPositionGTDeque.end(), currentTimeStampOfInterest,
+        //                          [](double ts, const transformationStamped& v) { return ts < v.timeStamp; });
 
+        int currentEntry = this->currentPositionGTDeque.size()-1;
+        // std::cout << "currentEntry" << currentEntry<< std::endl;
+        while (currentTimeStampOfInterest<this->currentPositionGTDeque[currentEntry].timeStamp) {
+                currentEntry --;
+            if (currentEntry<=0) {
+                break;
+            }
+        }
+        currentEntry++;
+        if (currentEntry == this->currentPositionGTDeque.size() ) {
+            currentEntry = this->currentPositionGTDeque.size()-1;
+        }
+        // std::cout << "currentEntry" << currentEntry<< std::endl;
         // if 0 or max then just take that  this->currentPositionGTDeque.begin()
         // if (i == 0 || i == this->currentPositionGTDeque.size()) break;
 
-        vertexList->back().setGroundTruthTransformation(this->currentPositionGTDeque[i].transformation);
-        // std::cout << "timestep of interest: " << currentTimeStampOfInterest<< std::endl;
-        // std::cout << "timestep i: " << this->currentPositionGTDeque[i].timeStamp<< std::endl;
+        vertexList->back().setGroundTruthTransformation(this->currentPositionGTDeque[currentEntry].transformation);
+         // std::cout << "timestep of interest: " << currentTimeStampOfInterest<< std::endl;
+        // std::cout << this->currentPositionGTDeque[currentEntry].transformation << std::endl;
+         // std::cout << "timestep i: " << this->currentPositionGTDeque[currentEntry].timeStamp<< std::endl;
+        // std::cout << "timestep back: " << this->currentPositionGTDeque.back().timeStamp<< std::endl;
         // if (i > 0) {
             // std::cout << "timestep i-1: " << this->currentPositionGTDeque[i-1].timeStamp<< std::endl;
         // }
@@ -543,14 +556,16 @@ private:
         // for (int k = 0; k < j; ++k) {
         //     this->currentPositionGTDeque.pop_front();
         // }
-
-        // Check if there are any entries left and they are within the 5-second window
-        while (!this->currentPositionGTDeque.empty() && (currentTimeStampOfInterest - this->currentPositionGTDeque.front().timeStamp > 5.0)) {
+        // std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
+        // std::cout << "Deleting entries: "<< std::endl;
+        // Check if there are any entries left and they are within the 10-second window
+        while (!this->currentPositionGTDeque.empty() && (currentTimeStampOfInterest - this->currentPositionGTDeque.front().timeStamp > 10.0)) {
+            // std::cout << "one deleted: "<< std::endl;
             this->currentPositionGTDeque.pop_front();
         }
 
-        std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
-        std::cout << "done" << std::endl;
+        // std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
+        // std::cout << "done" << std::endl;
     }
 
 

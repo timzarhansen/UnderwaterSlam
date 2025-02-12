@@ -29,9 +29,13 @@ class GpsToXYZNode(Node):
             self.gps_callbackCarol,
             10)
         # self.publisher1_ = self.create_publisher(PoseStamped, '/Alpha/xyz_topic', 10)
-        self.publisherAlpha_ = self.create_publisher(PoseArray, '/Alpha/gt_xyz', 10)
-        self.publisherBob_ = self.create_publisher(PoseArray, '/Bob/gt_xyz', 10)
-        self.publisherCarol_ = self.create_publisher(PoseArray, '/Carol/gt_xyz', 10)
+        self.publisherAlphaArray_ = self.create_publisher(PoseArray, '/Alpha/gt_xyzArray', 10)
+        self.publisherBobArray_ = self.create_publisher(PoseArray, '/Bob/gt_xyzArray', 10)
+        self.publisherCarolArray_ = self.create_publisher(PoseArray, '/Carol/gt_xyzArray', 10)
+
+        self.publisherAlpha_ = self.create_publisher(PoseStamped, '/Alpha/gt_xyz', 10)
+        self.publisherBob_ = self.create_publisher(PoseStamped, '/Bob/gt_xyz', 10)
+        self.publisherCarol_ = self.create_publisher(PoseStamped, '/Carol/gt_xyz', 10)
 
         self.transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:3857")
         self.beginningPoseAlpha = np.array([0.0, 0.0, 0.0])
@@ -75,7 +79,8 @@ class GpsToXYZNode(Node):
 
             self.poseArrayAlpha.poses.append(point_msg.pose)
             self.poseArrayAlpha.header.stamp = msg.header.stamp
-            self.publisherAlpha_.publish(self.poseArrayAlpha)
+            self.publisherAlphaArray_.publish(self.poseArrayAlpha)
+            self.publisherAlpha_.publish(point_msg)
 
     def gps_callbackBob(self, msg):
         x ,y,altitude = self.gpsConversion(msg)
@@ -95,7 +100,8 @@ class GpsToXYZNode(Node):
 
             self.poseArrayBob.poses.append(point_msg.pose)
             self.poseArrayBob.header.stamp = msg.header.stamp
-            self.publisherBob_.publish(self.poseArrayBob)
+            self.publisherBobArray_.publish(self.poseArrayBob)
+            self.publisherBob_.publish(point_msg)
     def gps_callbackCarol(self, msg):
         x ,y,altitude = self.gpsConversion(msg)
 
@@ -114,7 +120,8 @@ class GpsToXYZNode(Node):
 
             self.poseArrayCarol.poses.append(point_msg.pose)
             self.poseArrayCarol.header.stamp = msg.header.stamp
-            self.publisherCarol_.publish(self.poseArrayCarol)
+            self.publisherCarolArray_.publish(self.poseArrayCarol)
+            self.publisherCarol_.publish(point_msg)
 
 def main(args=None):
     rclpy.init(args=args)
