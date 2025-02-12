@@ -1,10 +1,13 @@
 #!/bin/bash
+
+sudo chown -R tim-external /home/tim-external/dataFolder
+
 ROS_DOMAIN_ID=1
 source /opt/ros/humble/setup.bash
 source /home/tim-external/ros_ws/install/setup.bash
 ros2 run fsregistration ros2ServiceRegistrationFS3D & >/dev/null 2>&1
 ros2 run underwaterslam conversionGPStoXYZ.py & >/dev/null 2>&1
-ros2 run underwaterslam odometryTest --ros-args --params-file c/pythonGeneratedParams/config1.yaml & >/dev/null 2>&1
+ros2 run underwaterslam odometryTest --ros-args --params-file /home/tim-external/ros_ws/src/UnderwaterSlam/params/pythonGeneratedParams/config1.yaml & >/dev/null 2>&1
 pid1=$!
 
 sleep 60
