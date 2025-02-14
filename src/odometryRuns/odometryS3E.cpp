@@ -63,7 +63,7 @@ public:
         this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
         this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
         this->declare_parameter<int>("time_until_save", 1);
-        this->declare_parameter<std::string>("which_registration", "GICP");
+        this->declare_parameter<std::string>("which_registration", "fs3d32GICP");
         this->declare_parameter<double>("scan_radius_max", 20.0);
 
 
@@ -84,19 +84,19 @@ public:
 
 
 
-        if (this->which_registration=="fs3d32"||this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP") {
+        if (this->which_registration=="fs3d32"||this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP"||this->which_registration=="fs3d32GICP") {
             this->dimension_of_registration = 32;
             this->voxel_size = 2*this->scan_radius_max/32;
             this->scanRegistrationObject = new scanRegistrationClass(32);
         }
 
-        if (this->which_registration=="fs3d64"||this->which_registration=="fs3d64ICP") {
+        if (this->which_registration=="fs3d64"||this->which_registration=="fs3d64ICP"||this->which_registration=="fs3d64GICP") {
             this->dimension_of_registration = 64;
             this->voxel_size = 2*this->scan_radius_max/64;
             this->scanRegistrationObject= new scanRegistrationClass(64);
         }
 
-        if (this->which_registration=="fs3d128"||this->which_registration=="fs3d128ICP") {
+        if (this->which_registration=="fs3d128"||this->which_registration=="fs3d128ICP"||this->which_registration=="fs3d128GICP") {
             this->dimension_of_registration = 128;
             this->voxel_size = 2*this->scan_radius_max/128;
             this->scanRegistrationObject= new scanRegistrationClass(128);
@@ -613,7 +613,9 @@ private:
 
 
         // FS3D stuff
-        if (registrationMethod=="fs3d32" || registrationMethod=="fs3d64"||registrationMethod=="fs3d128"|| registrationMethod=="fs3d32ICP"||registrationMethod=="fs3d64ICP"|| registrationMethod=="fs3d128ICP") {
+        if (registrationMethod=="fs3d32" || registrationMethod=="fs3d64"||registrationMethod=="fs3d128"||
+            registrationMethod=="fs3d32ICP"||registrationMethod=="fs3d64ICP"|| registrationMethod=="fs3d128ICP"||
+            registrationMethod=="fs3d32GICP"||registrationMethod=="fs3d64GICP"|| registrationMethod=="fs3d128GICP") {
             double* voxelData1;
             double* voxelData2;
             voxelData1 = (double*)calloc(
@@ -708,6 +710,21 @@ private:
                 std::cout << "our match before ICP" << std::endl;
                 std::cout << initialGuess << std::endl;
                 std::cout << "our match after ICP" << std::endl;
+                std::cout << currentRegistrationEstimation << std::endl;
+            }
+            if (registrationMethod=="fs3d32GICP"||registrationMethod=="fs3d64GICP"|| registrationMethod=="fs3d128GICP") {
+                double fitnessScore;
+                Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
+                std::cout << "starting ICP" << std::endl;
+                // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+
+                Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+                currentRegistrationEstimation = resultingICPRegistration;
+                std::cout << "our match before GICP" << std::endl;
+                std::cout << initialGuess << std::endl;
+                std::cout << "our match after GICP" << std::endl;
                 std::cout << currentRegistrationEstimation << std::endl;
             }
             finalTransformation = currentRegistrationEstimation;

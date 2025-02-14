@@ -33,7 +33,7 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
     gicp.setMaxCorrespondenceDistance(0.5);
     // gicp.setMaxCorrespondenceDistance (0.5);
     // Set the maximum number of iterations (criterion 1)
-    gicp.setMaximumIterations (50);
+    gicp.setMaximumIterations (20);
     // Set the transformation epsilon (criterion 2)
     gicp.setTransformationEpsilon (1e-8);
     // Set the euclidean distance difference epsilon (criterion 3)
