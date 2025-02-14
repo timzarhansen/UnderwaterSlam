@@ -63,7 +63,7 @@ public:
         this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
         this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
         this->declare_parameter<int>("time_until_save", 1);
-        this->declare_parameter<std::string>("which_registration", "ICP");
+        this->declare_parameter<std::string>("which_registration", "GICP");
         this->declare_parameter<double>("scan_radius_max", 20.0);
 
 
@@ -84,44 +84,22 @@ public:
 
 
 
-        if (this->which_registration=="fs3d32") {
+        if (this->which_registration=="fs3d32"||this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP") {
             this->dimension_of_registration = 32;
             this->voxel_size = 2*this->scan_radius_max/32;
             this->scanRegistrationObject = new scanRegistrationClass(32);
         }
 
-        if (this->which_registration=="fs3d64") {
+        if (this->which_registration=="fs3d64"||this->which_registration=="fs3d64ICP") {
             this->dimension_of_registration = 64;
             this->voxel_size = 2*this->scan_radius_max/64;
             this->scanRegistrationObject= new scanRegistrationClass(64);
         }
 
-        if (this->which_registration=="fs3d128") {
+        if (this->which_registration=="fs3d128"||this->which_registration=="fs3d128ICP") {
             this->dimension_of_registration = 128;
             this->voxel_size = 2*this->scan_radius_max/128;
             this->scanRegistrationObject= new scanRegistrationClass(128);
-        }
-        if (this->which_registration=="fs3d32ICP") {
-            this->dimension_of_registration = 32;
-            this->voxel_size = 2*this->scan_radius_max/32;
-            this->scanRegistrationObject = new scanRegistrationClass(32);
-        }
-
-        if (this->which_registration=="fs3d64ICP") {
-            this->dimension_of_registration = 64;
-            this->voxel_size = 2*this->scan_radius_max/64;
-            this->scanRegistrationObject= new scanRegistrationClass(64);
-        }
-
-        if (this->which_registration=="fs3d128ICP") {
-            this->dimension_of_registration = 128;
-            this->voxel_size = 2*this->scan_radius_max/128;
-            this->scanRegistrationObject= new scanRegistrationClass(128);
-        }
-        if (this->which_registration=="ICP") {
-            this->dimension_of_registration = 32;
-            this->voxel_size = 2*this->scan_radius_max/32;
-            this->scanRegistrationObject= new scanRegistrationClass(32);
         }
 
 
@@ -622,7 +600,16 @@ private:
             std::cout << finalTransformation << std::endl;
         }
 
-
+        //GICP stuff
+        if (registrationMethod=="GICP") {
+            double fitnessScore;
+            Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+            // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+            Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+            finalTransformation = resultingICPRegistration;
+            std::cout << "our match after GICP" << std::endl;
+            std::cout << finalTransformation << std::endl;
+        }
 
 
         // FS3D stuff

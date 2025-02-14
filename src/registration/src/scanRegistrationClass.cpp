@@ -30,7 +30,14 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
     gicp.setInputTarget(cloudFirstScan.makeShared());
 //    gicp.setSourceCovariances(source_covariances);
 //    gicp.setTargetCovariances(target_covariances);
-    gicp.setMaxCorrespondenceDistance(1.0);
+    gicp.setMaxCorrespondenceDistance(0.5);
+    // gicp.setMaxCorrespondenceDistance (0.5);
+    // Set the maximum number of iterations (criterion 1)
+    gicp.setMaximumIterations (50);
+    // Set the transformation epsilon (criterion 2)
+    gicp.setTransformationEpsilon (1e-8);
+    // Set the euclidean distance difference epsilon (criterion 3)
+    gicp.setEuclideanFitnessEpsilon (1);
 //    gicp.setRANSACOutlierRejectionThreshold(15);
 //    gicp.setMaximumIterations(0);
 //    gicp.setMaximumOptimizerIterations(100);
