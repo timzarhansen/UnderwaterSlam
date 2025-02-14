@@ -1,7 +1,7 @@
 //
 // Created by jurobotics on 13.09.21.
 //
-
+#define PCL_NO_PRECOMPILE
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
 // #include "ping360_sonar_msgs/msg/sonar_echo.hpp"
@@ -19,7 +19,10 @@
 // #include "pcl/conversions.h"
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/registration/gicp.h>
+#include <pcl/registration/registration.h>
 #include <Eigen/Dense>
+
+
 // #include "commonbluerovmsg/msg/state_robot_for_evaluation.hpp"
 
 
@@ -55,13 +58,13 @@ public:
     rosClassSlam() : Node("odometrypublisher"), graphSaved(6, POINT_CLOUD_SAVED)
     {
         //Parameter Definitions
-        this->declare_parameter<int>("number_of_skips", 1);
+        this->declare_parameter<int>("number_of_skips", 5);
         this->declare_parameter<std::string>("pcl_topic_name", "/Bob/velodyne_points");
         this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
         this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
         this->declare_parameter<int>("time_until_save", 1);
-        this->declare_parameter<std::string>("which_registration", "fs3d32");
-        this->declare_parameter<double>("scan_radius_max", 35.0);
+        this->declare_parameter<std::string>("which_registration", "ICP");
+        this->declare_parameter<double>("scan_radius_max", 20.0);
 
 
         this->which_registration = this->get_parameter("which_registration").as_string();
@@ -116,9 +119,9 @@ public:
             this->scanRegistrationObject= new scanRegistrationClass(128);
         }
         if (this->which_registration=="ICP") {
-            this->dimension_of_registration = 128;
-            this->voxel_size = 2*this->scan_radius_max/128;
-            this->scanRegistrationObject= new scanRegistrationClass(128);
+            this->dimension_of_registration = 32;
+            this->voxel_size = 2*this->scan_radius_max/32;
+            this->scanRegistrationObject= new scanRegistrationClass(32);
         }
 
 
@@ -216,7 +219,7 @@ private:
     Eigen::Matrix4d currentGTPosition;
 
     int indexLastFullScan;
-    double fitnessScore;
+    // double fitnessScore;
     double sigmaScaling;
 
     graphSlamSaveStructure graphSaved;
@@ -252,12 +255,14 @@ private:
         pclMeasurement PCLTMP;
 
         PCLTMP.time = rclcpp::Time(msg->header.stamp).seconds();
-        std::cout << "PCLTMP.time: " << PCLTMP.time <<std::endl;
+        // std::cout << "PCLTMP.time: " << PCLTMP.time <<std::endl;
         pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
         // std::cout << "2" << std::endl;
         pcl::fromROSMsg(*msg, cloudIncoming);
         // std::cout << "converted pcl to ROS " << std::endl;
-
+        std::vector<int> indices;
+        // pcl::removeNaNFromPointCloud(cloudFirstScan, cloudFirstScan, indices);
+        pcl::removeNaNFromPointCloud(cloudIncoming, cloudIncoming, indices);
 
         // pcl_conversions::toPCL(*msgPtr, cloudPtr);
         PCLTMP.pointcloud = cloudIncoming;
@@ -290,84 +295,13 @@ private:
         //     sizeof(double) * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION);
         // voxelData2 = (double*)malloc(
         //     sizeof(double) * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION * NUMBER_OF_POINTS_DIMENSION);
-        double* voxelData1;
-        double* voxelData2;
-        voxelData1 = (double*)calloc(
-            this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
-            sizeof(double));
-        voxelData2 = (double*)calloc(
-            this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
-            sizeof(double));
-        pcl::PointXYZ shift = pcl::PointXYZ(0, 0, 0);
-        // double voxelSize = (double)DIMENSION_OF_MAP / NUMBER_OF_POINTS_DIMENSION;
 
+
+        Eigen::Matrix4d currentRegistrationEstimation;
         pcl::PointCloud<pcl::PointXYZ> pclLastScan;
         pclLastScan = this->graphSaved.getVertexList()->back().getPCLMeasurement().pointcloud;
-        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_1_ply.ply", pclLastScan);
-        // std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
-        // std::cout << "size First PCL: "<< pclLastScan.size() << std::endl;
-        slamToolsRos::convertPointToVoxel(pclLastScan, voxelData1, this->dimension_of_registration,
-                                          this->voxel_size, this->voxel_size, this->voxel_size, shift);
 
-
-        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_2_ply.ply", cloudIncoming);
-        // std::cout << "size Second PCL: "<< cloudIncoming.size() << std::endl;
-        slamToolsRos::convertPointToVoxel(cloudIncoming, voxelData2, this->dimension_of_registration,
-                                          this->voxel_size, this->voxel_size, this->voxel_size, shift);
-
-        // std::ofstream voxel1,voxel2;
-        // voxel1.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel1Before.csv");
-        // voxel2.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel2Before.csv");
-        // //save errors angle
-        // for (int i = 0; i < NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION; i++) {
-        //     voxel1 << voxelData1[i];//time
-        //     voxel1 << "\n";//error
-        //     voxel2 << voxelData2[i];//time
-        //     voxel2 << "\n";//error
-        // }
-        // voxel1.close();
-        // voxel2.close();
-        // std::cout << "after pcl Conversion " << std::endl;
-        double maximumVoxelData = 1;
-        //Compute difference based on Registration
-        Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
-        Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
-        double timeToCalculate = 0;
-        // std::cout << "starting Registration: " << std::endl;
-        std::vector<fsregistration::msg::PotentialSolution3D> potentialSolutionsList = this->scanRegistrationObject->
-            registrationOfTwoVoxels3DSOFFTAllSoluations(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
-                                                        initialGuess,
-                                                        covarianceMatrix, this->voxel_size, timeToCalculate);
-        // std::cout << "finished Registration: " << std::endl;
-        //fine from list the right Solution and the do ICP afterwards.
-
-        double highestPeak = 0;
-        Eigen::Matrix4d currentRegistrationEstimation = Eigen::Matrix4d::Identity();
-        for (auto& estimatedTransformation : potentialSolutionsList)
-        {
-            //rotation
-
-            if (estimatedTransformation.transformation_peak_height > highestPeak)
-            {
-                Eigen::Quaterniond rotation(estimatedTransformation.resulting_transformation.orientation.w,
-                                            estimatedTransformation.resulting_transformation.orientation.x,
-                                            estimatedTransformation.resulting_transformation.orientation.y,
-                                            estimatedTransformation.resulting_transformation.orientation.z);
-
-                currentRegistrationEstimation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
-                currentRegistrationEstimation.block<3, 1>(0, 3) = Eigen::Vector3d(
-                    estimatedTransformation.resulting_transformation.position.x,
-                    estimatedTransformation.resulting_transformation.position.y,
-                    estimatedTransformation.resulting_transformation.position.z);
-                // std::cout << estimatedTransformation.potentialRotation.angle << std::endl;
-                highestPeak = estimatedTransformation.transformation_peak_height;
-            }
-            //translation
-        }
-        std::cout << "our match" << std::endl;
-        std::cout << currentRegistrationEstimation << std::endl;
-
-
+        registrationOfTwoPointclouds(pclLastScan,cloudIncoming,currentRegistrationEstimation,this->which_registration);
         // edge differenceOfEdge = ;
 
         Eigen::Matrix4d tmpTransformation = this->graphSaved.getVertexList()->back().getTransformation();
@@ -388,11 +322,13 @@ private:
         generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(currentRegistrationEstimationTranslation,
                                                                      currentRegistrationEstimationRotation,
                                                                      currentRegistrationEstimation);
-        // Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+        Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
         //overwrite the covariance matrix. at some point not necessary
         covarianceMatrix(0, 0) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(1, 1) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(2, 2) = INTEGRATED_NOISE_RPY;
+        std::cout << "Saving Registration in Graph:" << std::endl;
+        std::cout << currentRegistrationEstimation << std::endl;
         this->graphSaved.addEdge(this->graphSaved.getVertexList()->back().getKey() - 1,
                                  this->graphSaved.getVertexList()->back().getKey(),
                                  currentRegistrationEstimationTranslation, currentRegistrationEstimationRotation,
@@ -418,8 +354,7 @@ private:
         // slamToolsRos::visualizeCurrentPoseGraph(this->graphSaved, this->publisherSonarEcho,
         //                                         this->publisherMarkerArray, this->sigmaScaling,
         //                                         this->publisherPoseSLAM, this->publisherMarkerArrayLoopClosures,this->publisherEKF);
-        free(voxelData1);
-        free(voxelData2);
+
 
 
         std::cout << "published everything " << std::endl;
@@ -571,28 +506,7 @@ private:
 
 
 
-    // void gicpRegistration(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_src,
-    //                       const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_tgt,
-    //                       const Eigen::Matrix4d& init_guess,
-    //                       pcl::PointCloud<pcl::PointXYZ>::Ptr& result_cloud,
-    //                       Eigen::Matrix4d& transformation_matrix) {
-    //     Eigen::Isometry3d isometry_guess = Eigen::Isometry3d(init_guess.block<3, 3>(0, 0)).rotation() *
-    //                                        Eigen::Translation3d(init_guess.block<3, 1>(0, 3));
-    //
-    //     pcl::registration::GenericICP<pcl::PointXYZ, pcl::PointXYZ> gicp;
-    //     gicp.setMaximumIterations(30);
-    //     gicp.setTransformationEpsilon(1e-6);
-    //     gicp.setRotationEpsilon(1e-6);
-    //     gicp.setTransForm(isometry_guess);
-    //
-    //     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_src_temp(new pcl::PointCloud<pcl::PointXYZ>);
-    //     *cloud_src_temp = *cloud_src;
-    //
-    //     gicp.registerCloud(cloud_src_temp, cloud_tgt);
-    //
-    //     transformation_matrix = isometry_guess.cast<double>();
-    //     result_cloud = cloud_src_temp;
-    // }
+
 
 
 
@@ -693,9 +607,126 @@ private:
         if (timeToCalculate>this->time_until_save*60) {
             saveFullPoseArrayOfGraph();
         }
-
     }
 
+    void registrationOfTwoPointclouds(pcl::PointCloud<pcl::PointXYZ> firstPCL,pcl::PointCloud<pcl::PointXYZ> secondPCL,Eigen::Matrix4d &finalTransformation,std::string registrationMethod){
+
+        //ICP stuff
+        if (registrationMethod=="ICP") {
+            double fitnessScore;
+            Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+            // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+            Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
+            finalTransformation = resultingICPRegistration;
+            std::cout << "our match after ICP" << std::endl;
+            std::cout << finalTransformation << std::endl;
+        }
+
+
+
+
+        // FS3D stuff
+        if (registrationMethod=="fs3d32" || registrationMethod=="fs3d64"||registrationMethod=="fs3d128"|| registrationMethod=="fs3d32ICP"||registrationMethod=="fs3d64ICP"|| registrationMethod=="fs3d128ICP") {
+            double* voxelData1;
+            double* voxelData2;
+            voxelData1 = (double*)calloc(
+                this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+                sizeof(double));
+            voxelData2 = (double*)calloc(
+                this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+                sizeof(double));
+            pcl::PointXYZ shift = pcl::PointXYZ(0, 0, 0);
+            // double voxelSize = (double)DIMENSION_OF_MAP / NUMBER_OF_POINTS_DIMENSION;
+
+
+            // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_1_ply.ply", pclLastScan);
+            // std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
+            // std::cout << "size First PCL: "<< pclLastScan.size() << std::endl;
+            slamToolsRos::convertPointToVoxel(firstPCL, voxelData1, this->dimension_of_registration,
+                                              this->voxel_size, this->voxel_size, this->voxel_size, shift);
+
+
+            // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_2_ply.ply", cloudIncoming);
+            // std::cout << "size Second PCL: "<< cloudIncoming.size() << std::endl;
+            slamToolsRos::convertPointToVoxel(secondPCL, voxelData2, this->dimension_of_registration,
+                                              this->voxel_size, this->voxel_size, this->voxel_size, shift);
+
+            // std::ofstream voxel1,voxel2;
+            // voxel1.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel1Before.csv");
+            // voxel2.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel2Before.csv");
+            // //save errors angle
+            // for (int i = 0; i < NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION*NUMBER_OF_POINTS_DIMENSION; i++) {
+            //     voxel1 << voxelData1[i];//time
+            //     voxel1 << "\n";//error
+            //     voxel2 << voxelData2[i];//time
+            //     voxel2 << "\n";//error
+            // }
+            // voxel1.close();
+            // voxel2.close();
+            // std::cout << "after pcl Conversion " << std::endl;
+            double maximumVoxelData = 1;
+            //Compute difference based on Registration
+            Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+            Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+            double timeToCalculate = 0;
+            // std::cout << "starting Registration: " << std::endl;
+            std::vector<fsregistration::msg::PotentialSolution3D> potentialSolutionsList = this->scanRegistrationObject->
+                registrationOfTwoVoxels3DSOFFTAllSoluations(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
+                                                            initialGuess,
+                                                            covarianceMatrix, this->voxel_size, timeToCalculate);
+            // std::cout << "finished Registration: " << std::endl;
+            //fine from list the right Solution and the do ICP afterwards.
+
+            double highestPeak = 0;
+            Eigen::Matrix4d currentRegistrationEstimation = Eigen::Matrix4d::Identity();
+            for (auto& estimatedTransformation : potentialSolutionsList)
+            {
+                //rotation
+
+                if (estimatedTransformation.transformation_peak_height > highestPeak)
+                {
+                    Eigen::Quaterniond rotation(estimatedTransformation.resulting_transformation.orientation.w,
+                                                estimatedTransformation.resulting_transformation.orientation.x,
+                                                estimatedTransformation.resulting_transformation.orientation.y,
+                                                estimatedTransformation.resulting_transformation.orientation.z);
+
+                    currentRegistrationEstimation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
+                    currentRegistrationEstimation.block<3, 1>(0, 3) = Eigen::Vector3d(
+                        estimatedTransformation.resulting_transformation.position.x,
+                        estimatedTransformation.resulting_transformation.position.y,
+                        estimatedTransformation.resulting_transformation.position.z);
+                    // std::cout << estimatedTransformation.potentialRotation.angle << std::endl;
+                    highestPeak = estimatedTransformation.transformation_peak_height;
+                }
+                //translation
+            }
+            std::cout << "our match after FS3D" << std::endl;
+            std::cout << currentRegistrationEstimation << std::endl;
+
+            free(voxelData1);
+            free(voxelData2);
+
+
+            //fine alignment if ICP should be used
+            if (registrationMethod=="fs3d32ICP"||registrationMethod=="fs3d64ICP"|| registrationMethod=="fs3d128ICP") {
+                double fitnessScore;
+                Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
+                std::cout << "starting ICP" << std::endl;
+                // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+
+                Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+                currentRegistrationEstimation = resultingICPRegistration;
+                std::cout << "our match before ICP" << std::endl;
+                std::cout << initialGuess << std::endl;
+                std::cout << "our match after ICP" << std::endl;
+                std::cout << currentRegistrationEstimation << std::endl;
+            }
+            finalTransformation = currentRegistrationEstimation;
+        }
+
+    }
 public:
     geometry_msgs::msg::PoseArray getFullPoseArrayOfGraph()
     {

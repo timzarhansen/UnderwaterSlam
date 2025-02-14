@@ -1,6 +1,7 @@
 //
 // Created by tim on 16.02.21.
 //
+#define PCL_NO_PRECOMPILE
 #include "rclcpp/rclcpp.hpp"
 #include <iostream>
 // #include "fsregistration/srv/req.hpp"
@@ -9,7 +10,7 @@
 #include "fsregistration/srv/request_one_potential_solution2_d.hpp"
 #include "fsregistration/srv/request_list_potential_solution3_d.hpp"
 #include "fsregistration/srv/request_one_potential_solution3_d.hpp"
-
+#include "vector"
 #include <opencv4/opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv4/opencv2/core.hpp>
@@ -138,19 +139,19 @@ public:
 //        mySofftRegistrationClass.~softDescriptorRegistration();
 //    }
 
-//    Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                            double &fitnessScore);
-//
-//     Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                             pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                             double &fitnessScore, Eigen::Matrix4d &guess);
-// //
-//     Eigen::Matrix4d generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &Final,
-//                                                       double &fitnessScore,
-//                                                       Eigen::Matrix4d &initialGuessTransformation);
+   Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                           pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                           double &fitnessScore);
+
+    Eigen::Matrix4d generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                            pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                            double &fitnessScore, Eigen::Matrix4d &guess);
+
+    Eigen::Matrix4d generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                      pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                      pcl::PointCloud<pcl::PointXYZ> &Final,
+                                                      double &fitnessScore,
+                                                      Eigen::Matrix4d &initialGuessTransformation);
 //
 //    Eigen::Matrix4d sofftRegistration2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
 //                                        pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData2,
@@ -162,9 +163,8 @@ public:
 //                                        bool useInitialGuess,
 //                                        bool debug = false);
 //
-//    Eigen::Matrix4d icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                           pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                           pcl::PointCloud<pcl::PointXYZ> &Final);
+    Eigen::Matrix4d icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                           pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,double &fitnessScore,Eigen::Matrix4d initialGuessTransformation);
 
 //    Eigen::Matrix4d sofftRegistrationVoxel2D(double voxelData1[],
 //                                           double voxelData2[],

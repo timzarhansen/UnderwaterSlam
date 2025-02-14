@@ -2203,8 +2203,8 @@ void slamToolsRos::convertPointToVoxel(const pcl::PointCloud<pcl::PointXYZ>& poi
                                        const pcl::PointXYZ& shift)
 {
     // std::vector<int> voxelGrid(N * N * N, 0);
-    std::cout << "number of Points PCL: " << pointcloud.points.size() << std::endl;
-    std::cout << "shift: " << shift << std::endl;
+    // std::cout << "number of Points PCL: " << pointcloud.points.size() << std::endl;
+    // std::cout << "shift: " << shift << std::endl;
     double maxRadius = N*voxelSizeX/2.0*0.98;
     int number_of_ones = 0;
     for (const auto& point : pointcloud.points)
@@ -2225,7 +2225,7 @@ void slamToolsRos::convertPointToVoxel(const pcl::PointCloud<pcl::PointXYZ>& poi
             voxelData[index] = 1;
         }
     }
-    std::cout << "number of voxels: " << number_of_ones << std::endl;
+    // std::cout << "number of voxels: " << number_of_ones << std::endl;
 
 }
 

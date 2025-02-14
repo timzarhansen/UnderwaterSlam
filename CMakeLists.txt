@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_GTSAM_USE_SYSTEM_EIGEN ON)
 
 
@@ -67,7 +67,7 @@ find_package(micron_driver_ros REQUIRED)
 # general interface
 ################################################################################
 add_library(generalinterface INTERFACE)
-target_include_directories(generalinterface INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src/generalInterface/include)
+target_include_directories(generalinterface INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src/generalInterface/include ${PCL_INCLUDE_DIRS})
 
 ################################################################################
 # json
@@ -80,9 +80,9 @@ target_include_directories(json PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/json/incl
 # generalhelpfullib
 ################################################################################
 add_library(generalhelpfullib SHARED src/generalHelpfulTools/src/generalHelpfulTools.cpp src/generalHelpfulTools/src/PeakFinder.cpp)
-ament_target_dependencies(generalhelpfullib tf2 Eigen3 GTSAM PCL)
+ament_target_dependencies(generalhelpfullib tf2 Eigen3 GTSAM)
 target_include_directories(generalhelpfullib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/generalHelpfulTools/include)
-target_link_libraries(generalhelpfullib  ${PCL_LIBRARIES})
+#target_link_libraries(generalhelpfullib )
 
 
 ################################################################################
@@ -168,8 +168,8 @@ target_link_libraries(posegraph PUBLIC generalinterface json generalhelpfullib g
 
 add_library(registrationlib SHARED src/registration/src/scanRegistrationClass.cpp )
 ament_target_dependencies(registrationlib Eigen3 rclcpp  fsregistration tf2 tf2_geometry_msgs GTSAM PCL )
-target_include_directories(registrationlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/include ${OpenCV_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${INCLUDE_DIRECTORIES_ORU}) #${PCL_INCLUDE_DIRS}
-target_link_libraries(registrationlib generalhelpfullib ${OpenCV_LIBS} ${PCL_LIBRARIES}  ) # ${PYTHON_LIBRARIES}
+target_include_directories(registrationlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/include ${OpenCV_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${INCLUDE_DIRECTORIES_ORU} ${PCL_INCLUDE_DIRS})
+target_link_libraries(registrationlib  generalhelpfullib ${OpenCV_LIBS}  ${PCL_LIBRARIES} ) # ${PYTHON_LIBRARIES}
 
 
 ################################################################################
@@ -198,9 +198,9 @@ target_link_libraries(slamtools posegraph registrationlib )
 #target_include_directories(rosSlamTest PUBLIC ${INCLUDE_DIRECTORIES_ORU})
 
 add_executable(odometryTest src/odometryRuns/odometryS3E.cpp)
-ament_target_dependencies(odometryTest GTSAM geometry_msgs nav_msgs commonbluerovmsg pcl_conversions)
-target_link_libraries(odometryTest ${OpenCV_LIBS} posegraph slamtools generalhelpfullib )
-target_include_directories(odometryTest PUBLIC ${INCLUDE_DIRECTORIES_ORU})
+ament_target_dependencies(odometryTest GTSAM geometry_msgs nav_msgs commonbluerovmsg pcl_conversions PCL)
+target_link_libraries(odometryTest ${OpenCV_LIBS} posegraph slamtools) # registrationlib ${PCL_LIBRARIES}
+target_include_directories(odometryTest PUBLIC ${INCLUDE_DIRECTORIES_ORU}) # ${PCL_INCLUDE_DIRS}
 
 #add_executable(consecutiveScanTests src/evaluation/consecutiveScansMatchingMethod.cpp )
 #ament_target_dependencies(consecutiveScanTests GTSAM geometry_msgs ping360_sonar_msgs nav_msgs commonbluerovmsg )

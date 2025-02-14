@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo chown -R tim-external /home/tim-external/dataFolder
+#sudo chown -R tim-external /home/tim-external/dataFolder
 
 ROS_DOMAIN_ID=1
 source /opt/ros/humble/setup.bash

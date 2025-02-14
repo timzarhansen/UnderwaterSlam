@@ -7,83 +7,103 @@
 
 #include <gtsam/inference/Symbol.h>
 
-// Eigen::Matrix4d
-// scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                   pcl::PointCloud<pcl::PointXYZ> &Final,
-//                                                   double &fitnessScore, Eigen::Matrix4d &initialGuessTransformation) {
-//
-//     std::lock_guard<std::mutex> guard(*this->icpMutex);
-//
-//     if(cloudFirstScan.size()<20 || cloudSecondScan.size()<20){
-//         Eigen::Matrix4d guess = Eigen::Matrix4d::Identity();
-//         guess(3,3) = -1;
-//         return guess;
-//     }
-//     pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
-//
-//     // change here again the direction because we want to have the transformation from 1 to 2 and not from 2 to 1(which is the registration)
-//     gicp.setInputSource(cloudSecondScan.makeShared());
-//     gicp.setInputTarget(cloudFirstScan.makeShared());
-// //    gicp.setSourceCovariances(source_covariances);
-// //    gicp.setTargetCovariances(target_covariances);
-//     gicp.setMaxCorrespondenceDistance(1.0);
-// //    gicp.setRANSACOutlierRejectionThreshold(15);
-// //    gicp.setMaximumIterations(0);
-// //    gicp.setMaximumOptimizerIterations(100);
-// //    gicp.setMaximumIterations(100);
-// //    gicp.setRANSACIterations(100);
-//
-//     gicp.align(Final, initialGuessTransformation.cast<float>());
-//     //std::cout << "has converged:" << gicp.hasConverged() << " score: " <<
-//     //          gicp.getFitnessScore() << std::endl;
-//     fitnessScore = gicp.getFitnessScore();
-//     return gicp.getFinalTransformation().cast<double>();
-// }
-
-//Eigen::Matrix4d
-//scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                        pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                        double &fitnessScore) {
-//    Eigen::Matrix4d guess;
-//    guess << 1, 0, 0, 0,
-//            0, 1, 0, 0,
-//            0, 0, 1, 0,
-//            0, 0, 0, 1;
-//    pcl::PointCloud<pcl::PointXYZ> Final;
-//    return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
-//                                                             fitnessScore, guess);
-//}
-
-// Eigen::Matrix4d
-// scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                         pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                         double &fitnessScore, Eigen::Matrix4d &guess) {
-//
-//     pcl::PointCloud<pcl::PointXYZ> Final;
-//     return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
-//                                                              fitnessScore, guess);
-// }
+Eigen::Matrix4d
+scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                  pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                  pcl::PointCloud<pcl::PointXYZ> &Final,
+                                                  double &fitnessScore, Eigen::Matrix4d &initialGuessTransformation) {
 
 
-//Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &Final) {
-//    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-//    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL1 = cloudFirstScan.makeShared();
-//    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL2 = cloudSecondScan.makeShared();
-//
-//    icp.setInputSource(tmpPCL1);
-//    icp.setInputTarget(tmpPCL2);
-//
-//    icp.align(Final);
-//    std::cout << "has converged:" << icp.hasConverged() << " score: " <<
-//              icp.getFitnessScore() << std::endl;
-//    std::cout << icp.getFinalTransformation() << std::endl;
-//
-//
-//    return icp.getFinalTransformation().cast<double>();
-//}
+
+
+    std::lock_guard<std::mutex> guard(*this->icpMutex);
+
+    if(cloudFirstScan.size()<20 || cloudSecondScan.size()<20){
+        Eigen::Matrix4d guess = Eigen::Matrix4d::Identity();
+        guess(3,3) = -1;
+        return guess;
+    }
+    // pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
+    pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
+    // change here again the direction because we want to have the transformation from 1 to 2 and not from 2 to 1(which is the registration)
+    gicp.setInputSource(cloudSecondScan.makeShared());
+    gicp.setInputTarget(cloudFirstScan.makeShared());
+//    gicp.setSourceCovariances(source_covariances);
+//    gicp.setTargetCovariances(target_covariances);
+    gicp.setMaxCorrespondenceDistance(1.0);
+//    gicp.setRANSACOutlierRejectionThreshold(15);
+//    gicp.setMaximumIterations(0);
+//    gicp.setMaximumOptimizerIterations(100);
+//    gicp.setMaximumIterations(100);
+//    gicp.setRANSACIterations(100);
+
+    gicp.align(Final, initialGuessTransformation.cast<float>());
+    std::cout << "alignment done" << std::endl;
+    std::cout << "has converged:" << gicp.hasConverged() << std::endl;
+    //std::cout << "has converged:" << gicp.hasConverged() << " score: " <<
+    //          gicp.getFitnessScore() << std::endl;
+    fitnessScore = gicp.getFitnessScore();
+    return gicp.getFinalTransformation().cast<double>();
+}
+
+Eigen::Matrix4d
+scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                        pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                        double &fitnessScore) {
+    Eigen::Matrix4d guess;
+    guess << 1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1;
+    pcl::PointCloud<pcl::PointXYZ> Final;
+    return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
+                                                             fitnessScore, guess);
+}
+
+Eigen::Matrix4d
+scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                        pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                        double &fitnessScore, Eigen::Matrix4d &guess) {
+    pcl::PointCloud<pcl::PointXYZ> Final;
+    return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
+                                                             fitnessScore, guess);
+}
+
+
+Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,double &fitnessScore,Eigen::Matrix4d initialGuessTransformation) {
+    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL1 = cloudFirstScan.makeShared();
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL2 = cloudSecondScan.makeShared();
+    // std::vector<int> indices;
+    // pcl::removeNaNFromPointCloud(*tmpPCL1, *tmpPCL1, indices);
+    // pcl::removeNaNFromPointCloud(*tmpPCL2, *tmpPCL2, indices);
+
+    icp.setInputSource(tmpPCL1);
+    icp.setInputTarget(tmpPCL2);
+    // Set the max correspondence distance to 5cm (e.g., correspondences with higher
+    // distances will be ignored)
+    icp.setMaxCorrespondenceDistance (0.5);
+    // Set the maximum number of iterations (criterion 1)
+    icp.setMaximumIterations (50);
+    // Set the transformation epsilon (criterion 2)
+    icp.setTransformationEpsilon (1e-8);
+    // Set the euclidean distance difference epsilon (criterion 3)
+    icp.setEuclideanFitnessEpsilon (1);
+
+    std::cout << "initialGuessTransformation:" << std::endl;
+    std::cout << initialGuessTransformation << std::endl;
+    // Eigen::Matrix4d initialGuessTransformation = Eigen::Matrix4d::Identity();
+    pcl::PointCloud<pcl::PointXYZ> Final;
+    icp.align(Final,initialGuessTransformation.cast<float>());
+    // std::cout << "alignment done" << std::endl;
+    // std::cout << "has converged:" << icp.hasConverged() << std::endl;
+    // std::cout << " score: " << icp.getFitnessScore() << std::endl;
+    // std::cout << icp.getFinalTransformation() << std::endl;
+    fitnessScore = 1;
+
+    return icp.getFinalTransformation().cast<double>();
+}
 
 
 //Eigen::Matrix4d scanRegistrationClass::sofftRegistration2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
