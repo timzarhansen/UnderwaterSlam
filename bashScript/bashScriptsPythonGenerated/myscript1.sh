@@ -1,7 +1,4 @@
 #!/bin/bash
-
-#sudo chown -R tim-external /home/tim-external/dataFolder
-
 ROS_DOMAIN_ID=1
 source /opt/ros/humble/setup.bash
 source /home/tim-external/ros_ws/install/setup.bash
@@ -11,5 +8,5 @@ ros2 run underwaterslam odometryTest --ros-args --params-file /home/tim-external
 pid1=$!
 
 sleep 60
-ros2 bag play /home/tim-external/dataFolder/S3E/S3Ev1/S3E_Campus_Road_1/ -r 0.2
+ros2 bag play /home/tim-external/dataFolder/S3E/S3Ev1/S3E_Campus_Road_1/ -r 1.0
 wait $pid1

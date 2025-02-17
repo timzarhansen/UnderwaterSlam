@@ -58,14 +58,13 @@ public:
     rosClassSlam() : Node("odometrypublisher"), graphSaved(6, POINT_CLOUD_SAVED)
     {
         //Parameter Definitions
-        this->declare_parameter<int>("number_of_skips", 5);
-        this->declare_parameter<std::string>("pcl_topic_name", "/Bob/velodyne_points");
-        this->declare_parameter<std::string>("pose_topic_name", "/Bob/poseArray");
-        this->declare_parameter<std::string>("gt_topic_name", "/Bob/gt_xyz");
+        this->declare_parameter<int>("number_of_skips", 2);
+        this->declare_parameter<std::string>("pcl_topic_name", "/Alpha/velodyne_points");
+        this->declare_parameter<std::string>("pose_topic_name", "/Alpha/poseArray");
+        this->declare_parameter<std::string>("gt_topic_name", "/Alpha/gt_xyz");
         this->declare_parameter<int>("time_until_save", 1);
-        this->declare_parameter<std::string>("which_registration", "fs3d32GICP");
-        this->declare_parameter<double>("scan_radius_max", 20.0);
-
+        this->declare_parameter<std::string>("which_registration", "ICP");
+        this->declare_parameter<double>("scan_radius_max", 25.0);
 
         this->which_registration = this->get_parameter("which_registration").as_string();
         std::cout << "which_registration: " << which_registration << std::endl;
@@ -81,7 +80,7 @@ public:
         std::cout << "time_until_save: " << this->time_until_save << std::endl;
         this->scan_radius_max= this->get_parameter("scan_radius_max").as_double();
         std::cout << "scan_radius_max: " << this->scan_radius_max << std::endl;
-
+//        this->time_until_save = 1;
 
 
         if (this->which_registration=="fs3d32"||this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP"||this->which_registration=="fs3d32GICP") {
@@ -107,9 +106,9 @@ public:
 
 
         //we have to make sure, to get ALL the data. Therefor we have to change that in the future.
-        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(10), rmw_qos_profile_system_default);
+        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepAll(), rmw_qos_profile_system_default);
         qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_KEEP_ALL);
-        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         qos.durability(rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT);
         qos.liveliness(rmw_qos_liveliness_policy_e::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT);
         qos.deadline(rmw_time_t(RMW_DURATION_INFINITE));
