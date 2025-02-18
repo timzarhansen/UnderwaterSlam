@@ -43,14 +43,16 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
 //    gicp.setMaximumOptimizerIterations(100);
 //    gicp.setMaximumIterations(100);
 //    gicp.setRANSACIterations(100);
-
+    initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
     gicp.align(Final, initialGuessTransformation.cast<float>());
     std::cout << "alignment done" << std::endl;
     std::cout << "has converged:" << gicp.hasConverged() << std::endl;
     //std::cout << "has converged:" << gicp.hasConverged() << " score: " <<
     //          gicp.getFitnessScore() << std::endl;
     fitnessScore = gicp.getFitnessScore();
-    return gicp.getFinalTransformation().cast<double>();
+    Eigen::Matrix4d finalReturnMatrix = gicp.getFinalTransformation().cast<double>();
+    finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    return finalReturnMatrix;
 }
 
 Eigen::Matrix4d
@@ -97,7 +99,7 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     icp.setTransformationEpsilon (1e-8);
     // Set the euclidean distance difference epsilon (criterion 3)
     icp.setEuclideanFitnessEpsilon (1);
-
+    initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
     std::cout << "initialGuessTransformation:" << std::endl;
     std::cout << initialGuessTransformation << std::endl;
     // Eigen::Matrix4d initialGuessTransformation = Eigen::Matrix4d::Identity();
@@ -108,8 +110,9 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     // std::cout << " score: " << icp.getFitnessScore() << std::endl;
     // std::cout << icp.getFinalTransformation() << std::endl;
     fitnessScore = 1;
-
-    return icp.getFinalTransformation().cast<double>();
+    Eigen::Matrix4d finalReturnMatrix = icp.getFinalTransformation().cast<double>();
+    finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    return finalReturnMatrix;
 }
 
 

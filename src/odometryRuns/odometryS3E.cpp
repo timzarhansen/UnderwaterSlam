@@ -219,7 +219,9 @@ private:
     std::chrono::steady_clock::time_point time_last_pointcloud;
     // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::string folderForSaving;
-
+    //PCL for memory Saving
+    pclMeasurement lastPCL;
+    pclMeasurement currentPCl;
 
 
     void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -231,7 +233,7 @@ private:
         // std::cout << "mutex Started" << std::endl;
         pclMeasurement PCLTMP;
 
-        PCLTMP.time = rclcpp::Time(msg->header.stamp).seconds();
+        this->currentPCl.time = rclcpp::Time(msg->header.stamp).seconds();
         // std::cout << "PCLTMP.time: " << PCLTMP.time <<std::endl;
         pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
         // std::cout << "2" << std::endl;
@@ -242,7 +244,7 @@ private:
         pcl::removeNaNFromPointCloud(cloudIncoming, cloudIncoming, indices);
 
         // pcl_conversions::toPCL(*msgPtr, cloudPtr);
-        PCLTMP.pointcloud = cloudIncoming;
+        this->currentPCl.pointcloud = cloudIncoming;
 
         // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_ply.ply", PCLTMP.pointcloud);
         // pcl::io::savePCDFileASCII ("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_pcd.pcd", cloudPtr);
@@ -250,14 +252,16 @@ private:
         // std::cout << "First Sonar Input" << std::endl;
         if (this->firstSonarInput)
         {
+
             this->graphSaved.addVertexPCL(0, Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond(1, 0, 0, 0),
-                                          Eigen::Matrix3d::Zero(), PCLTMP, rclcpp::Time(msg->header.stamp).seconds(),
+                                          Eigen::Matrix3d::Zero(),PCLTMP, rclcpp::Time(msg->header.stamp).seconds(),
                                           FIRST_ENTRY);
             this->graphSaved.print();
             this->firstSonarInput = false;
             sleep(1);
             this->saveCurrentGTPosition();
             std::cout << "Saving GT position first time Done" << std::endl;
+            this->lastPCL = this->currentPCl;
             return;
         }
 
@@ -276,7 +280,8 @@ private:
 
         Eigen::Matrix4d currentRegistrationEstimation;
         pcl::PointCloud<pcl::PointXYZ> pclLastScan;
-        pclLastScan = this->graphSaved.getVertexList()->back().getPCLMeasurement().pointcloud;
+        // pclLastScan = this->graphSaved.getVertexList()->back().getPCLMeasurement().pointcloud;
+        pclLastScan = this->lastPCL.pointcloud;
 
         registrationOfTwoPointclouds(pclLastScan,cloudIncoming,currentRegistrationEstimation,this->which_registration);
         // edge differenceOfEdge = ;
@@ -312,6 +317,7 @@ private:
                                  covarianceMatrix, INTEGRATED_POSE);
         std::cout << "save GT Pose" << std::endl;
         this->saveCurrentGTPosition();
+        this->lastPCL = this->currentPCl;
         // std::cout << "added edge to Graph" << std::endl;
         ////////////// look for loop closure  //////////////
         // slamToolsRos::loopDetectionByClosestPath(this->graphSaved, this->scanRegistrationObject,
@@ -715,6 +721,7 @@ private:
                 double fitnessScore;
                 Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
                 std::cout << "starting ICP" << std::endl;
+                std::cout << initialGuess << std::endl;
                 // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
 
