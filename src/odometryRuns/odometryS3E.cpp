@@ -420,7 +420,7 @@ private:
         // std::cout << "adding stuff to deque: " << std::endl;
 
         this->currentPositionGTDeque.push_back(tmpValue);
-        std::sort(currentPositionGTDeque.begin(), currentPositionGTDeque.end(), compareByTimestamp);
+        std::sort(currentPositionGTDeque.begin(), currentPositionGTDeque.end(), this->compareByTimestamp);
         // std::cout << tmpValue.transformation << std::endl;
         // std::cout << tmpValue.timeStamp << std::endl;
         // std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
