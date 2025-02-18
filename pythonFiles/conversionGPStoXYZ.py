@@ -19,10 +19,7 @@ class GpsToXYZNode(Node):
             history=HistoryPolicy.KEEP_ALL,
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.SYSTEM_DEFAULT,
-            liveliness=LivelinessPolicy.SYSTEM_DEFAULT,
-            deadline=rclpy.duration.Duration(seconds=float('inf')).to_msg(),
-            lifespan=rclpy.duration.Duration(seconds=float('inf')).to_msg(),
-            liveliness_lease_duration=rclpy.duration.Duration(seconds=float('inf')).to_msg()
+            liveliness=LivelinessPolicy.SYSTEM_DEFAULT
         )
 
 
