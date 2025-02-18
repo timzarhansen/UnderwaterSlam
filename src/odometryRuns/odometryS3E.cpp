@@ -262,14 +262,16 @@ private:
     {
 
 
-        // this->time_last_pointcloud = std::chrono::steady_clock::now();
+
 
         pclMeasurement PCLTMP;
 
         bool returnValue = returnNextPCL(this->currentPCl);
         if (!returnValue) {
+            std::cout << " pcl list empty" << std::endl;
             return;
         }
+        this->time_last_pointcloud = std::chrono::steady_clock::now();
         std::vector<int> indices;
 
         pcl::removeNaNFromPointCloud(this->currentPCl.pointcloud, this->currentPCl.pointcloud, indices);
@@ -368,7 +370,7 @@ private:
 
 
 
-        // std::cout << "published everything " << std::endl;
+        std::cout << "published everything " << std::endl;
     }
 
     // bool saveGraph(const std::shared_ptr<commonbluerovmsg::srv::SaveGraph::Request> req,
@@ -778,10 +780,11 @@ public:
     void run()
     {
         std::cout << "running now in while Loop" << std::endl;
+        rclcpp::Rate loop_rate(10);
         while (rclcpp::ok()) // Check if the ROS 2 node is still running
         {
             this->updatingPCLCallback();
-            sleep(0.01); // Sleep for 0.01 second to avoid high CPU usage
+            loop_rate.sleep(); // Sleep for 0.01 second to avoid high CPU usage
         }
     }
 
