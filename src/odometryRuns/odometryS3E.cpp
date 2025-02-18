@@ -390,9 +390,7 @@ private:
     //     res->saved = true;
     //     return true;
     // }
-    bool compareByTimestamp(const transformationStamped& a, const transformationStamped& b) {
-        return a.timeStamp < b.timeStamp;
-    }
+
 
     void groundTruthGPSEvaluationCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
@@ -420,7 +418,10 @@ private:
         // std::cout << "adding stuff to deque: " << std::endl;
 
         this->currentPositionGTDeque.push_back(tmpValue);
-        std::sort(currentPositionGTDeque.begin(), currentPositionGTDeque.end(), this->compareByTimestamp);
+        auto compareTimeStamps = [](const transformationStamped& a, const transformationStamped& b) {
+            return a.timeStamp < b.timeStamp;
+        };
+        std::sort(currentPositionGTDeque.begin(), currentPositionGTDeque.end(), compareTimeStamps);
         // std::cout << tmpValue.transformation << std::endl;
         // std::cout << tmpValue.timeStamp << std::endl;
         // std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
