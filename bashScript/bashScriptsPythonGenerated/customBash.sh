@@ -1,4 +1,5 @@
 #!/bin/bash
+ROS_LOCALHOST_ONLY=1
 ROS_DOMAIN_ID=162
 source /opt/ros/humble/setup.bash
 source /home/tim-external/ros_ws/install/setup.bash

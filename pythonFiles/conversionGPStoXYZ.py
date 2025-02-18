@@ -7,12 +7,27 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import PoseArray
 import pyproj
 import numpy as np
-
+from rclpy.qos import QoSProfile, HistoryPolicy, ReliabilityPolicy, DurabilityPolicy, LivelinessPolicy
 
 
 class GpsToXYZNode(Node):
     def __init__(self):
         super().__init__('gps_to_xyz_node')
+
+        qos_profile = QoSProfile(
+            depth=10,  # Set the depth of the message queue
+            history=HistoryPolicy.KEEP_ALL,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.SYSTEM_DEFAULT,
+            liveliness=LivelinessPolicy.SYSTEM_DEFAULT,
+            deadline=rclpy.duration.Duration(seconds=float('inf')).to_msg(),
+            lifespan=rclpy.duration.Duration(seconds=float('inf')).to_msg(),
+            liveliness_lease_duration=rclpy.duration.Duration(seconds=float('inf')).to_msg()
+        )
+
+
+
+
         self.subscriptionAlpha = self.create_subscription(
             NavSatFix,
             '/Alpha/fix',
