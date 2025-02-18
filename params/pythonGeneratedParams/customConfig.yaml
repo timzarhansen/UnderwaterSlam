@@ -4,6 +4,6 @@
     "number_of_skips": 5
     "pcl_topic_name": "/Alpha/velodyne_points"
     "pose_topic_name": "/Alpha/poseArray"
-    "scan_radius_max": 25.0
+    "scan_radius_max": 21.0
     "time_until_save": 1
-    "which_registration": "fs3d32"
+    "which_registration": "ICP"

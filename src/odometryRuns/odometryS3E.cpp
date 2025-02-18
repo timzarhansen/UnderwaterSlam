@@ -148,6 +148,9 @@ public:
         this->timer_ = this->create_wall_timer(
             my_timer_duration, std::bind(&rosClassSlam::timerFunction, this));
 
+        // std::chrono::duration<double> my_timer_duration_odometry = std::chrono::duration<double>(0.01);
+        // this->odometryTimer = this->create_wall_timer(
+        //     my_timer_duration_odometry, std::bind(&rosClassSlam::updatingPCLCallback, this));
 
         this->sigmaScaling = 1.0;
         this->firstSonarInput = true;
@@ -183,16 +186,19 @@ private:
     rclcpp::CallbackGroup::SharedPtr callback_group_subscriber1_;
     rclcpp::CallbackGroup::SharedPtr callback_group_subscriber2_;
     rclcpp::TimerBase::SharedPtr timer_;
+    // rclcpp::TimerBase::SharedPtr odometryTimer;
 
     std::mutex groundTruthMutex;
     std::mutex odometryMutex;
-
+    std::mutex pclMutex;
     //Matrices:
     Eigen::Matrix4d currentEstimatedTransformation;
     Eigen::Matrix4d initialGuessTransformation;
 
     // GT savings
     std::deque<transformationStamped> currentPositionGTDeque;
+    std::deque<pclMeasurement> pclMeasurementDeque;
+
     Eigen::Matrix4d currentGTPosition;
 
     int indexLastFullScan;
@@ -222,39 +228,61 @@ private:
     //PCL for memory Saving
     pclMeasurement lastPCL;
     pclMeasurement currentPCl;
+    void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(this->pclMutex);
+        pclMeasurement currentPCL;
 
+        pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
+        pcl::fromROSMsg(*msg, cloudIncoming);
+        currentPCL.pointcloud = cloudIncoming;
+        currentPCL.time = rclcpp::Time(msg->header.stamp).seconds();
+        this->pclMeasurementDeque.push_back(currentPCL);
+        std::cout <<  std::setprecision(19);
+        std::cout << "new PCL coming in: " << currentPCL.time << std::endl;
 
-    void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    }
+
+    bool returnNextPCL(pclMeasurement &currentMeasurementComingIn) {
+        std::lock_guard<std::mutex> lock(this->pclMutex);
+        if (this->pclMeasurementDeque.empty()) {
+            return 0;
+        }
+
+        auto compareTimeStampsPCL = [](const pclMeasurement& a, const pclMeasurement& b) {
+            return a.time < b.time;
+        };
+        std::sort(this->pclMeasurementDeque.begin(), this->pclMeasurementDeque.end(), compareTimeStampsPCL);
+        std::cout << "size of PCL Deque: " << this->pclMeasurementDeque.size() << std::endl;
+        currentMeasurementComingIn = this->pclMeasurementDeque.front();
+        this->pclMeasurementDeque.pop_front();
+        return 1;
+    }
+
+    void updatingPCLCallback()
     {
 
-        // std::cout << "valodyneCallback Started" << std::endl;
-        std::lock_guard<std::mutex> lock(this->odometryMutex);
-        this->time_last_pointcloud = std::chrono::steady_clock::now();
-        // std::cout << "mutex Started" << std::endl;
+
+        // this->time_last_pointcloud = std::chrono::steady_clock::now();
+
         pclMeasurement PCLTMP;
 
-        this->currentPCl.time = rclcpp::Time(msg->header.stamp).seconds();
-        // std::cout << "PCLTMP.time: " << PCLTMP.time <<std::endl;
-        pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
-        // std::cout << "2" << std::endl;
-        pcl::fromROSMsg(*msg, cloudIncoming);
-        // std::cout << "converted pcl to ROS " << std::endl;
+        bool returnValue = returnNextPCL(this->currentPCl);
+        if (!returnValue) {
+            return;
+        }
         std::vector<int> indices;
-        // pcl::removeNaNFromPointCloud(cloudFirstScan, cloudFirstScan, indices);
-        pcl::removeNaNFromPointCloud(cloudIncoming, cloudIncoming, indices);
 
-        // pcl_conversions::toPCL(*msgPtr, cloudPtr);
-        this->currentPCl.pointcloud = cloudIncoming;
+        pcl::removeNaNFromPointCloud(this->currentPCl.pointcloud, this->currentPCl.pointcloud, indices);
 
-        // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_ply.ply", PCLTMP.pointcloud);
-        // pcl::io::savePCDFileASCII ("/home/tim-external/dataFolder/pointclouds/testPCLs/test_"+std::to_string(this->numberOfScans)+"_pcd.pcd", cloudPtr);
+        pcl::PointCloud<pcl::PointXYZ> cloudIncoming = this->currentPCl.pointcloud;
 
-        // std::cout << "First Sonar Input" << std::endl;
+
+
         if (this->firstSonarInput)
         {
 
             this->graphSaved.addVertexPCL(0, Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond(1, 0, 0, 0),
-                                          Eigen::Matrix3d::Zero(),PCLTMP, rclcpp::Time(msg->header.stamp).seconds(),
+                                          Eigen::Matrix3d::Zero(),PCLTMP, this->currentPCl.time,
                                           FIRST_ENTRY);
             this->graphSaved.print();
             this->firstSonarInput = false;
@@ -296,7 +324,7 @@ private:
         this->graphSaved.addVertexPCL(this->graphSaved.getVertexList()->back().getKey() + 1, pos, rot,
                                       this->graphSaved.getVertexList()->back().getCovarianceMatrix(),
                                       PCLTMP,
-                                      rclcpp::Time(msg->header.stamp).seconds(),
+                                       this->currentPCl.time,
                                       POINT_CLOUD_SAVED);
         // std::cout << "added vertex to Graph" << std::endl;
         Eigen::Vector3d currentRegistrationEstimationTranslation;
@@ -309,13 +337,13 @@ private:
         covarianceMatrix(0, 0) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(1, 1) = INTEGRATED_NOISE_XYZ;
         covarianceMatrix(2, 2) = INTEGRATED_NOISE_RPY;
-        std::cout << "Saving Registration in Graph:" << std::endl;
-        std::cout << currentRegistrationEstimation << std::endl;
+        // std::cout << "Saving Registration in Graph:" << std::endl;
+        // std::cout << currentRegistrationEstimation << std::endl;
         this->graphSaved.addEdge(this->graphSaved.getVertexList()->back().getKey() - 1,
                                  this->graphSaved.getVertexList()->back().getKey(),
                                  currentRegistrationEstimationTranslation, currentRegistrationEstimationRotation,
                                  covarianceMatrix, INTEGRATED_POSE);
-        std::cout << "save GT Pose" << std::endl;
+        // std::cout << "save GT Pose" << std::endl;
         this->saveCurrentGTPosition();
         this->lastPCL = this->currentPCl;
         // std::cout << "added edge to Graph" << std::endl;
@@ -329,7 +357,7 @@ private:
 
         this->graphSaved.isam2OptimizeGraph(true, 1);
         //        this->graphSaved.isam2OptimizeGraph(true,1);
-        std::cout << "optimize Stuff" << std::endl;
+        // std::cout << "optimize Stuff" << std::endl;
         // visualize graph
         geometry_msgs::msg::PoseArray poseArrayToPublish = getFullPoseArrayOfGraph();
         this->publisherPoseOdometry->publish(poseArrayToPublish);
@@ -340,7 +368,7 @@ private:
 
 
 
-        std::cout << "published everything " << std::endl;
+        // std::cout << "published everything " << std::endl;
     }
 
     // bool saveGraph(const std::shared_ptr<commonbluerovmsg::srv::SaveGraph::Request> req,
@@ -423,7 +451,8 @@ private:
         };
         std::sort(currentPositionGTDeque.begin(), currentPositionGTDeque.end(), compareTimeStamps);
         // std::cout << tmpValue.transformation << std::endl;
-        // std::cout << tmpValue.timeStamp << std::endl;
+        std::cout <<  std::setprecision(19);
+        std::cout << "added to GT: " << tmpValue.timeStamp << std::endl;
         // std::cout << rclcpp::Time(msg->header.stamp).seconds() << std::endl;
     }
 
@@ -451,7 +480,7 @@ private:
         int currentEntry = this->currentPositionGTDeque.size()-1;
         // std::cout << "currentEntry" << currentEntry<< std::endl;
         while (currentTimeStampOfInterest<this->currentPositionGTDeque[currentEntry].timeStamp) {
-                currentEntry --;
+            currentEntry --;
             if (currentEntry<=0) {
                 break;
             }
@@ -465,16 +494,18 @@ private:
         // if (i == 0 || i == this->currentPositionGTDeque.size()) break;
 
         vertexList->back().setGroundTruthTransformation(this->currentPositionGTDeque[currentEntry].transformation);
-         // std::cout << "timestep of interest: " << currentTimeStampOfInterest<< std::endl;
+        std::cout << "Size GT Array Before: " << this->currentPositionGTDeque.size()<< std::endl;
+        std::cout << "timestep of interest: " << currentTimeStampOfInterest<< std::endl;
         // std::cout << this->currentPositionGTDeque[currentEntry].transformation << std::endl;
-         // std::cout << "timestep i: " << this->currentPositionGTDeque[currentEntry].timeStamp<< std::endl;
-        // std::cout << "timestep back: " << this->currentPositionGTDeque.back().timeStamp<< std::endl;
-        // if (i > 0) {
-            // std::cout << "timestep i-1: " << this->currentPositionGTDeque[i-1].timeStamp<< std::endl;
-        // }
-        // if (i < this->currentPositionGTDeque.size()-1) {
-            // std::cout << "timestep i+1: " << this->currentPositionGTDeque[i+1].timeStamp<< std::endl;
-        // }
+        std::cout << "timestep i: " << this->currentPositionGTDeque[currentEntry].timeStamp<< std::endl;
+        std::cout << "timestep back: " << this->currentPositionGTDeque.back().timeStamp<< std::endl;
+        std::cout << "timestep front: " << this->currentPositionGTDeque.front().timeStamp<< std::endl;
+        if (currentEntry > 0) {
+            std::cout << "timestep i-1: " << this->currentPositionGTDeque[currentEntry-1].timeStamp<< std::endl;
+        }
+        if (currentEntry < this->currentPositionGTDeque.size()-1) {
+            std::cout << "timestep i+1: " << this->currentPositionGTDeque[currentEntry+1].timeStamp<< std::endl;
+        }
         // Remove processed entries
         // for (int k = 0; k < j; ++k) {
         //     this->currentPositionGTDeque.pop_front();
@@ -482,12 +513,12 @@ private:
         // std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
         // std::cout << "Deleting entries: "<< std::endl;
         // Check if there are any entries left and they are within the 10-second window
-        while (!this->currentPositionGTDeque.empty() && (currentTimeStampOfInterest - this->currentPositionGTDeque.front().timeStamp > 10.0)) {
+        while (!this->currentPositionGTDeque.empty() && (currentTimeStampOfInterest - this->currentPositionGTDeque.front().timeStamp > 100.0)) {
             // std::cout << "one deleted: "<< std::endl;
             this->currentPositionGTDeque.pop_front();
         }
 
-        // std::cout << "Size GT Array: " << this->currentPositionGTDeque.size()<< std::endl;
+        std::cout << "Size GT Array afterwards: " << this->currentPositionGTDeque.size()<< std::endl;
         // std::cout << "done" << std::endl;
     }
 
@@ -606,8 +637,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            std::cout << "our match after ICP" << std::endl;
-            std::cout << finalTransformation << std::endl;
+            // std::cout << "our match after ICP" << std::endl;
+            // std::cout << finalTransformation << std::endl;
         }
 
         //GICP stuff
@@ -617,8 +648,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            std::cout << "our match after GICP" << std::endl;
-            std::cout << finalTransformation << std::endl;
+            // std::cout << "our match after GICP" << std::endl;
+            // std::cout << finalTransformation << std::endl;
         }
 
 
@@ -699,8 +730,8 @@ private:
                 }
                 //translation
             }
-            std::cout << "our match after FS3D" << std::endl;
-            std::cout << currentRegistrationEstimation << std::endl;
+            // std::cout << "our match after FS3D" << std::endl;
+            // std::cout << currentRegistrationEstimation << std::endl;
 
             free(voxelData1);
             free(voxelData2);
@@ -710,39 +741,52 @@ private:
             if (registrationMethod=="fs3d32ICP"||registrationMethod=="fs3d64ICP"|| registrationMethod=="fs3d128ICP") {
                 double fitnessScore;
                 Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
-                std::cout << "starting ICP" << std::endl;
+                // std::cout << "starting ICP" << std::endl;
                 // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
 
                 Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
 
                 currentRegistrationEstimation = resultingICPRegistration;
-                std::cout << "our match before ICP" << std::endl;
-                std::cout << initialGuess << std::endl;
-                std::cout << "our match after ICP" << std::endl;
-                std::cout << currentRegistrationEstimation << std::endl;
+                // std::cout << "our match before ICP" << std::endl;
+                // std::cout << initialGuess << std::endl;
+                // std::cout << "our match after ICP" << std::endl;
+                // std::cout << currentRegistrationEstimation << std::endl;
             }
             if (registrationMethod=="fs3d32GICP"||registrationMethod=="fs3d64GICP"|| registrationMethod=="fs3d128GICP") {
                 double fitnessScore;
                 Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
-                std::cout << "starting ICP" << std::endl;
-                std::cout << initialGuess << std::endl;
+                // std::cout << "starting ICP" << std::endl;
+                // std::cout << initialGuess << std::endl;
                 // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
 
                 Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
                 currentRegistrationEstimation = resultingICPRegistration;
-                std::cout << "our match before GICP" << std::endl;
-                std::cout << initialGuess << std::endl;
-                std::cout << "our match after GICP" << std::endl;
-                std::cout << currentRegistrationEstimation << std::endl;
+                // std::cout << "our match before GICP" << std::endl;
+                // std::cout << initialGuess << std::endl;
+                // std::cout << "our match after GICP" << std::endl;
+                // std::cout << currentRegistrationEstimation << std::endl;
             }
             finalTransformation = currentRegistrationEstimation;
         }
 
     }
 public:
+
+    void run()
+    {
+        std::cout << "running now in while Loop" << std::endl;
+        while (rclcpp::ok()) // Check if the ROS 2 node is still running
+        {
+            this->updatingPCLCallback();
+            sleep(0.01); // Sleep for 0.01 second to avoid high CPU usage
+        }
+    }
+
+
+
     geometry_msgs::msg::PoseArray getFullPoseArrayOfGraph()
     {
         // std::cout << " starting getting dataset "<<std::endl;
@@ -831,7 +875,22 @@ int main(int argc, char** argv)
     auto node = std::make_shared<rosClassSlam>();
     rclcpp::executors::MultiThreadedExecutor executor;
     executor.add_node(node);
-    executor.spin();
+    // executor.spin();
+
+
+    // Start the execution in a separate thread
+    std::thread executor_thread([&executor]() {
+        executor.spin();
+    });
+
+    // Call the run method in the main thread
+    node->run();
+
+    // Wait for the executor thread to finish
+    executor_thread.join();
+
+
+
     rclcpp::shutdown();
 
     return (0);

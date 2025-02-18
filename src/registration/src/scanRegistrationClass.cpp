@@ -100,8 +100,8 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     // Set the euclidean distance difference epsilon (criterion 3)
     icp.setEuclideanFitnessEpsilon (1);
     initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
-    std::cout << "initialGuessTransformation:" << std::endl;
-    std::cout << initialGuessTransformation << std::endl;
+    // std::cout << "initialGuessTransformation:" << std::endl;
+    // std::cout << initialGuessTransformation << std::endl;
     // Eigen::Matrix4d initialGuessTransformation = Eigen::Matrix4d::Identity();
     pcl::PointCloud<pcl::PointXYZ> Final;
     icp.align(Final,initialGuessTransformation.cast<float>());
