@@ -1311,8 +1311,8 @@ slamToolsRos::getDatasetFromGraphforPoseArray(std::vector<Eigen::Matrix4d>& data
     // double maxOverall = 0;
     for (int i = 0; i < graphSaved.getVertexList()->size(); i++)
     {
-        // Eigen::Matrix4d transformation = graphSaved.getVertexList()->at(i).getTransformation();
-        Eigen::Matrix4d transformation = graphSaved.getVertexList()->at(i).getGroundTruthTransformation();
+        Eigen::Matrix4d transformation = graphSaved.getVertexList()->at(i).getTransformation();
+        // Eigen::Matrix4d transformation = graphSaved.getVertexList()->at(i).getGroundTruthTransformation();
 
         dataSet.push_back(transformation);
     }
