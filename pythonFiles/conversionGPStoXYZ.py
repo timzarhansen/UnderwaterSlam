@@ -15,9 +15,9 @@ class GpsToXYZNode(Node):
         super().__init__('gps_to_xyz_node')
 
         qos_profile = QoSProfile(
-            depth=10,  # Set the depth of the message queue
-            history=HistoryPolicy.KEEP_ALL,
-            reliability=ReliabilityPolicy.RELIABLE,
+            depth=100,  # Set the depth of the message queue
+            history=HistoryPolicy.KEEP_LAST,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.SYSTEM_DEFAULT,
             liveliness=LivelinessPolicy.SYSTEM_DEFAULT
         )
@@ -45,9 +45,9 @@ class GpsToXYZNode(Node):
         self.publisherBobArray_ = self.create_publisher(PoseArray, '/Bob/gt_xyzArray', 10)
         self.publisherCarolArray_ = self.create_publisher(PoseArray, '/Carol/gt_xyzArray', 10)
 
-        self.publisherAlpha_ = self.create_publisher(PoseStamped, '/Alpha/gt_xyz', 10)
-        self.publisherBob_ = self.create_publisher(PoseStamped, '/Bob/gt_xyz', 10)
-        self.publisherCarol_ = self.create_publisher(PoseStamped, '/Carol/gt_xyz', 10)
+        self.publisherAlpha_ = self.create_publisher(PoseStamped, '/Alpha/gt_xyz', qos_profile)
+        self.publisherBob_ = self.create_publisher(PoseStamped, '/Bob/gt_xyz', qos_profile)
+        self.publisherCarol_ = self.create_publisher(PoseStamped, '/Carol/gt_xyz', qos_profile)
 
         self.transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:3857")
         self.beginningPoseAlpha = np.array([0.0, 0.0, 0.0])

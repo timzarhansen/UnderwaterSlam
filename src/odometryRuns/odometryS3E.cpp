@@ -106,9 +106,9 @@ public:
 
 
         //we have to make sure, to get ALL the data. Therefor we have to change that in the future.
-        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepAll(), rmw_qos_profile_system_default);
-        qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_KEEP_ALL);
-        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(100), rmw_qos_profile_system_default);
+        qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT);
+        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
         qos.durability(rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT);
         qos.liveliness(rmw_qos_liveliness_policy_e::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT);
         qos.deadline(rmw_time_t(RMW_DURATION_INFINITE));
@@ -230,6 +230,7 @@ private:
     pclMeasurement currentPCl;
     void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(this->pclMutex);
+        this->time_last_pointcloud = std::chrono::steady_clock::now();
         pclMeasurement currentPCL;
 
         pcl::PointCloud<pcl::PointXYZ> cloudIncoming;
@@ -237,41 +238,41 @@ private:
         currentPCL.pointcloud = cloudIncoming;
         currentPCL.time = rclcpp::Time(msg->header.stamp).seconds();
         this->pclMeasurementDeque.push_back(currentPCL);
+        auto compareTimeStampsPCL = [](const pclMeasurement& a, const pclMeasurement& b) {
+            return a.time < b.time;
+        };
+        std::sort(this->pclMeasurementDeque.begin(), this->pclMeasurementDeque.end(), compareTimeStampsPCL);
         std::cout <<  std::setprecision(19);
         std::cout << "new PCL coming in: " << currentPCL.time << std::endl;
 
     }
 
-    bool returnNextPCL(pclMeasurement &currentMeasurementComingIn) {
+    bool returnNextPCL(pclMeasurement &currentMeasurementComingIn,bool overwritepclSize) {
         std::lock_guard<std::mutex> lock(this->pclMutex);
+
+        if (this->pclMeasurementDeque.size()<100&& !overwritepclSize) {
+            return 0;
+        }
         if (this->pclMeasurementDeque.empty()) {
             return 0;
         }
-
-        auto compareTimeStampsPCL = [](const pclMeasurement& a, const pclMeasurement& b) {
-            return a.time < b.time;
-        };
-        std::sort(this->pclMeasurementDeque.begin(), this->pclMeasurementDeque.end(), compareTimeStampsPCL);
+        this->time_last_pointcloud = std::chrono::steady_clock::now();
         std::cout << "size of PCL Deque: " << this->pclMeasurementDeque.size() << std::endl;
         currentMeasurementComingIn = this->pclMeasurementDeque.front();
         this->pclMeasurementDeque.pop_front();
         return 1;
     }
 
-    void updatingPCLCallback()
+    bool updatingPCLCallback(bool overwritePCLSize)
     {
-
-
-
-
         pclMeasurement PCLTMP;
 
-        bool returnValue = returnNextPCL(this->currentPCl);
+        bool returnValue = returnNextPCL(this->currentPCl,overwritePCLSize);
         if (!returnValue) {
             std::cout << " pcl list empty" << std::endl;
-            return;
+            return 0;
         }
-        this->time_last_pointcloud = std::chrono::steady_clock::now();
+        // this->time_last_pointcloud = std::chrono::steady_clock::now();
         std::vector<int> indices;
 
         pcl::removeNaNFromPointCloud(this->currentPCl.pointcloud, this->currentPCl.pointcloud, indices);
@@ -292,12 +293,12 @@ private:
             this->saveCurrentGTPosition();
             std::cout << "Saving GT position first time Done" << std::endl;
             this->lastPCL = this->currentPCl;
-            return;
+            return 1;
         }
 
         this->numberOfScans++;
         if (this->numberOfScans % this->number_of_skips != 0) {
-            return;
+            return 1;
         }
         // std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
         // double* voxelData1;
@@ -371,6 +372,7 @@ private:
 
 
         std::cout << "published everything " << std::endl;
+        return 1;
     }
 
     // bool saveGraph(const std::shared_ptr<commonbluerovmsg::srv::SaveGraph::Request> req,
@@ -626,6 +628,11 @@ private:
         double timeToCalculate = std::chrono::duration_cast<std::chrono::seconds>(currentTime - this->time_last_pointcloud).count();
         std::cout << "Timing function called: " << timeToCalculate << " ___ " << this->time_until_save*60 << std::endl;
         if (timeToCalculate>this->time_until_save*60) {
+            while (this->updatingPCLCallback(1)) {
+                //doNothing
+                std::cout << "running last PCLs in dataset" << std::endl;
+            }
+            std::cout << "done" << std::endl;
             saveFullPoseArrayOfGraph();
         }
     }
@@ -780,11 +787,13 @@ public:
     void run()
     {
         std::cout << "running now in while Loop" << std::endl;
-        rclcpp::Rate loop_rate(10);
+        rclcpp::Rate loop_rate(1);
         while (rclcpp::ok()) // Check if the ROS 2 node is still running
         {
-            this->updatingPCLCallback();
-            loop_rate.sleep(); // Sleep for 0.01 second to avoid high CPU usage
+            bool didComputationHappen = this->updatingPCLCallback(0);
+            if (!didComputationHappen) {
+                loop_rate.sleep(); // Sleep for 0.01 second to avoid high CPU usage
+            }
         }
     }
 
