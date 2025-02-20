@@ -43,6 +43,7 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
 //    gicp.setMaximumOptimizerIterations(100);
 //    gicp.setMaximumIterations(100);
 //    gicp.setRANSACIterations(100);
+    //for the same settings as FS3D
     initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
     gicp.align(Final, initialGuessTransformation.cast<float>());
     std::cout << "alignment done" << std::endl;

@@ -228,6 +228,7 @@ private:
     //PCL for memory Saving
     pclMeasurement lastPCL;
     pclMeasurement currentPCl;
+
     void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(this->pclMutex);
         this->time_last_pointcloud = std::chrono::steady_clock::now();
@@ -773,10 +774,6 @@ private:
                 Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
                 currentRegistrationEstimation = resultingICPRegistration;
-                // std::cout << "our match before GICP" << std::endl;
-                // std::cout << initialGuess << std::endl;
-                // std::cout << "our match after GICP" << std::endl;
-                // std::cout << currentRegistrationEstimation << std::endl;
             }
             finalTransformation = currentRegistrationEstimation;
         }
