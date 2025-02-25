@@ -647,8 +647,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            // std::cout << "our match after ICP" << std::endl;
-            // std::cout << finalTransformation << std::endl;
+            std::cout << "our match after ICP" << std::endl;
+            std::cout << finalTransformation << std::endl;
         }
 
         //GICP stuff
@@ -658,8 +658,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            // std::cout << "our match after GICP" << std::endl;
-            // std::cout << finalTransformation << std::endl;
+            std::cout << "our match after GICP" << std::endl;
+            std::cout << finalTransformation << std::endl;
         }
 
 
@@ -740,8 +740,8 @@ private:
                 }
                 //translation
             }
-            // std::cout << "our match after FS3D" << std::endl;
-            // std::cout << currentRegistrationEstimation << std::endl;
+            std::cout << "our match after FS3D" << std::endl;
+            std::cout << currentRegistrationEstimation << std::endl;
 
             free(voxelData1);
             free(voxelData2);
@@ -760,19 +760,22 @@ private:
                 currentRegistrationEstimation = resultingICPRegistration;
                 // std::cout << "our match before ICP" << std::endl;
                 // std::cout << initialGuess << std::endl;
-                // std::cout << "our match after ICP" << std::endl;
-                // std::cout << currentRegistrationEstimation << std::endl;
+                std::cout << "our match after ICP" << std::endl;
+                std::cout << resultingICPRegistration << std::endl;
             }
             if (registrationMethod=="fs3d32GICP"||registrationMethod=="fs3d64GICP"|| registrationMethod=="fs3d128GICP") {
                 double fitnessScore;
                 Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
+                // Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+
                 // std::cout << "starting ICP" << std::endl;
                 // std::cout << initialGuess << std::endl;
                 // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
 
 
                 Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
-
+                std::cout << "our match after GICP" << std::endl;
+                std::cout << resultingICPRegistration << std::endl;
                 currentRegistrationEstimation = resultingICPRegistration;
             }
             finalTransformation = currentRegistrationEstimation;

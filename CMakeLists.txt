@@ -223,8 +223,8 @@ target_include_directories(odometryTest PUBLIC ${INCLUDE_DIRECTORIES_ORU}) # ${P
 #target_link_libraries(compute3DMap ${OpenCV_LIBS} json generalhelpfullib)
 
 
-add_executable(gtSAMTest src/gtsamTests/simpleExample.cpp )
-ament_target_dependencies(gtSAMTest GTSAM Eigen3 )
+add_executable(gtSAMTest src/gtsamTests/simpleExample.cpp)
+ament_target_dependencies(gtSAMTest GTSAM Eigen3)
 target_link_libraries(gtSAMTest PUBLIC gtsam)
 
 
@@ -245,6 +245,7 @@ install(TARGETS
         #        guibluerov2
         DESTINATION lib/${PROJECT_NAME}
 )
+
 install(PROGRAMS
         pythonFiles/conversionGPStoXYZ.py
         DESTINATION lib/${PROJECT_NAME}

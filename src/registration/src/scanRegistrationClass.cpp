@@ -13,7 +13,7 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
                                                   pcl::PointCloud<pcl::PointXYZ> &Final,
                                                   double &fitnessScore, Eigen::Matrix4d &initialGuessTransformation) {
 
-
+    Eigen::Matrix4d tmpMatrix = Eigen::Matrix4d::Identity();
 
 
     std::lock_guard<std::mutex> guard(*this->icpMutex);
@@ -44,7 +44,11 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
 //    gicp.setMaximumIterations(100);
 //    gicp.setRANSACIterations(100);
     //for the same settings as FS3D
-    initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*initialGuessTransformation;
+    tmpMatrix= initialGuessTransformation.inverse();
+    initialGuessTransformation = tmpMatrix;
+
     gicp.align(Final, initialGuessTransformation.cast<float>());
     std::cout << "alignment done" << std::endl;
     std::cout << "has converged:" << gicp.hasConverged() << std::endl;
@@ -52,7 +56,15 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
     //          gicp.getFitnessScore() << std::endl;
     fitnessScore = gicp.getFitnessScore();
     Eigen::Matrix4d finalReturnMatrix = gicp.getFinalTransformation().cast<double>();
-    finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    std::cout << "finalReturnMatrix:" <<  std::endl;
+    std::cout << finalReturnMatrix <<  std::endl;
+    // finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    // finalReturnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*finalReturnMatrix;
+    tmpMatrix = finalReturnMatrix.inverse();
+    finalReturnMatrix = tmpMatrix;
+    std::cout << "finalReturnMatrix After:" <<  std::endl;
+    std::cout << finalReturnMatrix <<  std::endl;
+
     return finalReturnMatrix;
 }
 
@@ -85,6 +97,8 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
     pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL1 = cloudFirstScan.makeShared();
     pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL2 = cloudSecondScan.makeShared();
+    Eigen::Matrix4d tmpMatrix = Eigen::Matrix4d::Identity();
+
     // std::vector<int> indices;
     // pcl::removeNaNFromPointCloud(*tmpPCL1, *tmpPCL1, indices);
     // pcl::removeNaNFromPointCloud(*tmpPCL2, *tmpPCL2, indices);
@@ -100,7 +114,11 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     icp.setTransformationEpsilon (1e-8);
     // Set the euclidean distance difference epsilon (criterion 3)
     icp.setEuclideanFitnessEpsilon (1);
-    initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*initialGuessTransformation;
+    tmpMatrix = initialGuessTransformation.inverse();
+    initialGuessTransformation = tmpMatrix;
+
     // std::cout << "initialGuessTransformation:" << std::endl;
     // std::cout << initialGuessTransformation << std::endl;
     // Eigen::Matrix4d initialGuessTransformation = Eigen::Matrix4d::Identity();
@@ -110,9 +128,14 @@ Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::Poin
     // std::cout << "has converged:" << icp.hasConverged() << std::endl;
     // std::cout << " score: " << icp.getFitnessScore() << std::endl;
     // std::cout << icp.getFinalTransformation() << std::endl;
+
     fitnessScore = 1;
     Eigen::Matrix4d finalReturnMatrix = icp.getFinalTransformation().cast<double>();
-    finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    // finalReturnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*finalReturnMatrix;
+    // finalReturnMatrix = finalReturnMatrix.inverse();
+    tmpMatrix = finalReturnMatrix.inverse();
+    finalReturnMatrix = tmpMatrix;
+    // finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
     return finalReturnMatrix;
 }
 
