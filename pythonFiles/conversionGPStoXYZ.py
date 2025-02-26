@@ -16,8 +16,8 @@ class GpsToXYZNode(Node):
 
         qos_profile = QoSProfile(
             depth=100,  # Set the depth of the message queue
-            history=HistoryPolicy.KEEP_LAST,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_ALL,
+            reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.SYSTEM_DEFAULT,
             liveliness=LivelinessPolicy.SYSTEM_DEFAULT
         )
@@ -29,21 +29,21 @@ class GpsToXYZNode(Node):
             NavSatFix,
             '/Alpha/fix',
             self.gps_callbackAlpha,
-            10)
+            qos_profile)
         self.subscriptionBob = self.create_subscription(
             NavSatFix,
             '/Bob/fix',
             self.gps_callbackBob,
-            10)
+            qos_profile)
         self.subscriptionCarol = self.create_subscription(
             NavSatFix,
             '/Carol/fix',
             self.gps_callbackCarol,
-            10)
+            qos_profile)
         # self.publisher1_ = self.create_publisher(PoseStamped, '/Alpha/xyz_topic', 10)
-        self.publisherAlphaArray_ = self.create_publisher(PoseArray, '/Alpha/gt_xyzArray', 10)
-        self.publisherBobArray_ = self.create_publisher(PoseArray, '/Bob/gt_xyzArray', 10)
-        self.publisherCarolArray_ = self.create_publisher(PoseArray, '/Carol/gt_xyzArray', 10)
+        self.publisherAlphaArray_ = self.create_publisher(PoseArray, '/Alpha/gt_xyzArray', qos_profile)
+        self.publisherBobArray_ = self.create_publisher(PoseArray, '/Bob/gt_xyzArray', qos_profile)
+        self.publisherCarolArray_ = self.create_publisher(PoseArray, '/Carol/gt_xyzArray', qos_profile)
 
         self.publisherAlpha_ = self.create_publisher(PoseStamped, '/Alpha/gt_xyz', qos_profile)
         self.publisherBob_ = self.create_publisher(PoseStamped, '/Bob/gt_xyz', qos_profile)

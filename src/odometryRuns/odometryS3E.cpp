@@ -83,19 +83,22 @@ public:
 //        this->time_until_save = 1;
 
 
-        if (this->which_registration=="fs3d32"||this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP"||this->which_registration=="fs3d32GICP") {
+        if (this->which_registration=="fs3d32"||this->which_registration=="fs3d32IG"||
+        this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP"||this->which_registration=="fs3d32IGICP"||
+        this->which_registration=="fs3d32GICP"||this->which_registration=="fs3d32IGGICP") {
             this->dimension_of_registration = 32;
             this->voxel_size = 2*this->scan_radius_max/32;
             this->scanRegistrationObject = new scanRegistrationClass(32);
         }
 
-        if (this->which_registration=="fs3d64"||this->which_registration=="fs3d64ICP"||this->which_registration=="fs3d64GICP") {
+        if (this->which_registration=="fs3d64"||this->which_registration=="fs3d64ICP"||this->which_registration=="fs3d64GICP"||this->which_registration=="fs3d64IG"||this->which_registration=="fs3d64IGICP"||this->which_registration=="fs3d64IGGICP") {
             this->dimension_of_registration = 64;
             this->voxel_size = 2*this->scan_radius_max/64;
             this->scanRegistrationObject= new scanRegistrationClass(64);
         }
 
-        if (this->which_registration=="fs3d128"||this->which_registration=="fs3d128ICP"||this->which_registration=="fs3d128GICP") {
+        if (this->which_registration=="fs3d128"||this->which_registration=="fs3d128ICP"||this->which_registration=="fs3d128GICP"||
+this->which_registration=="fs3d128IG"||this->which_registration=="fs3d128IGICP"||this->which_registration=="fs3d128IGGICP") {
             this->dimension_of_registration = 128;
             this->voxel_size = 2*this->scan_radius_max/128;
             this->scanRegistrationObject= new scanRegistrationClass(128);
@@ -107,8 +110,8 @@ public:
 
         //we have to make sure, to get ALL the data. Therefor we have to change that in the future.
         rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(100), rmw_qos_profile_system_default);
-        qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT);
-        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+        qos.history(rmw_qos_history_policy_e::RMW_QOS_POLICY_HISTORY_KEEP_ALL);
+        qos.reliability(rmw_qos_reliability_policy_e::RMW_QOS_POLICY_RELIABILITY_RELIABLE);
         qos.durability(rmw_qos_durability_policy_e::RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT);
         qos.liveliness(rmw_qos_liveliness_policy_e::RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT);
         qos.deadline(rmw_time_t(RMW_DURATION_INFINITE));
@@ -160,6 +163,7 @@ public:
 
         this->maxTimeOptimization = 1.0;
         this->numberOfScans = 0;
+        this->numberOfValodyneMessagesComingIn = 0;
         this->time_last_pointcloud = std::chrono::steady_clock::now();
         std::string whichRobot;
         if (this->pcl_topic_name=="/Alpha/velodyne_points") {
@@ -211,6 +215,7 @@ private:
     std::string saveStringGraph;
     double maxTimeOptimization;
     int numberOfScans;
+    int numberOfValodyneMessagesComingIn;
     int numberOfTimesFirstScan;
     // parameters
     int dimension_of_registration;
@@ -245,6 +250,8 @@ private:
         std::sort(this->pclMeasurementDeque.begin(), this->pclMeasurementDeque.end(), compareTimeStampsPCL);
         std::cout <<  std::setprecision(19);
         std::cout << "new PCL coming in: " << currentPCL.time << std::endl;
+        this->numberOfValodyneMessagesComingIn++;
+        std::cout << "number of PCLs:  " << this->numberOfValodyneMessagesComingIn << std::endl;
 
     }
 
@@ -301,7 +308,7 @@ private:
         if (this->numberOfScans % this->number_of_skips != 0) {
             return 1;
         }
-        // std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
+        std::cout << "this->numberOfScans: " << this->numberOfScans << std::endl;
         // double* voxelData1;
         // double* voxelData2;
         // voxelData1 = (double*)malloc(
@@ -647,8 +654,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            std::cout << "our match after ICP" << std::endl;
-            std::cout << finalTransformation << std::endl;
+            // std::cout << "our match after ICP" << std::endl;
+            // std::cout << finalTransformation << std::endl;
         }
 
         //GICP stuff
@@ -658,8 +665,8 @@ private:
             // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
             finalTransformation = resultingICPRegistration;
-            std::cout << "our match after GICP" << std::endl;
-            std::cout << finalTransformation << std::endl;
+            // std::cout << "our match after GICP" << std::endl;
+            // std::cout << finalTransformation << std::endl;
         }
 
 
@@ -711,9 +718,10 @@ private:
             double timeToCalculate = 0;
             // std::cout << "starting Registration: " << std::endl;
             std::vector<fsregistration::msg::PotentialSolution3D> potentialSolutionsList = this->scanRegistrationObject->
-                registrationOfTwoVoxels3DSOFFTAllSoluations(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
+                registrationOfTwoVoxels3DSOFFTAllSolutions(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
                                                             initialGuess,
                                                             covarianceMatrix, this->voxel_size, timeToCalculate);
+
             // std::cout << "finished Registration: " << std::endl;
             //fine from list the right Solution and the do ICP afterwards.
 
@@ -740,8 +748,8 @@ private:
                 }
                 //translation
             }
-            std::cout << "our match after FS3D" << std::endl;
-            std::cout << currentRegistrationEstimation << std::endl;
+            // std::cout << "our match after FS3D" << std::endl;
+            // std::cout << currentRegistrationEstimation << std::endl;
 
             free(voxelData1);
             free(voxelData2);
@@ -760,8 +768,8 @@ private:
                 currentRegistrationEstimation = resultingICPRegistration;
                 // std::cout << "our match before ICP" << std::endl;
                 // std::cout << initialGuess << std::endl;
-                std::cout << "our match after ICP" << std::endl;
-                std::cout << resultingICPRegistration << std::endl;
+                // std::cout << "our match after ICP" << std::endl;
+                // std::cout << resultingICPRegistration << std::endl;
             }
             if (registrationMethod=="fs3d32GICP"||registrationMethod=="fs3d64GICP"|| registrationMethod=="fs3d128GICP") {
                 double fitnessScore;
@@ -774,12 +782,123 @@ private:
 
 
                 Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
-                std::cout << "our match after GICP" << std::endl;
-                std::cout << resultingICPRegistration << std::endl;
+                // std::cout << "our match after GICP" << std::endl;
+                // std::cout << resultingICPRegistration << std::endl;
                 currentRegistrationEstimation = resultingICPRegistration;
             }
             finalTransformation = currentRegistrationEstimation;
         }
+
+        // FS3D WITH INITIAL GUESS stuff
+        if (registrationMethod=="fs3d32IG" || registrationMethod=="fs3d64IG"||registrationMethod=="fs3d128IG"||
+            registrationMethod=="fs3d32IGICP"||registrationMethod=="fs3d64IGICP"|| registrationMethod=="fs3d128IGICP"||
+            registrationMethod=="fs3d32IGGICP"||registrationMethod=="fs3d64IGGICP"|| registrationMethod=="fs3d128GIGICP") {
+            double* voxelData1;
+            double* voxelData2;
+            voxelData1 = (double*)calloc(
+                this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+                sizeof(double));
+            voxelData2 = (double*)calloc(
+                this->dimension_of_registration * this->dimension_of_registration * this->dimension_of_registration,
+                sizeof(double));
+            pcl::PointXYZ shift = pcl::PointXYZ(0, 0, 0);
+            // double voxelSize = (double)DIMENSION_OF_MAP / NUMBER_OF_POINTS_DIMENSION;
+
+
+            // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_1_ply.ply", pclLastScan);
+            // std::cout << "sizeGraph: "<< this->graphSaved.getVertexList()->size() << std::endl;
+            //std::cout << "size First PCL: "<< firstPCL.size() << std::endl;
+            slamToolsRos::convertPointToVoxel(firstPCL, voxelData1, this->dimension_of_registration,
+                                              this->voxel_size, this->voxel_size, this->voxel_size, shift);
+
+
+            // pcl::io::savePLYFile("/home/tim-external/dataFolder/pointclouds/testPCLs/test_2_ply.ply", cloudIncoming);
+            //std::cout << "size Second PCL: "<< secondPCL.size() << std::endl;
+            slamToolsRos::convertPointToVoxel(secondPCL, voxelData2, this->dimension_of_registration,
+                                              this->voxel_size, this->voxel_size, this->voxel_size, shift);
+
+            // std::ofstream voxel1,voxel2;
+            // voxel1.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel1Before.csv");
+            // voxel2.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel2Before.csv");
+            // //save errors angle
+            // for (int i = 0; i < this->dimension_of_registration*this->dimension_of_registration*this->dimension_of_registration; i++) {
+            //     voxel1 << voxelData1[i];//time
+            //     voxel1 << "\n";//error
+            //     voxel2 << voxelData2[i];//time
+            //     voxel2 << "\n";//error
+            // }
+            // voxel1.close();
+            // voxel2.close();
+            std::cout << "after pcl Conversion " << std::endl;
+            double maximumVoxelData = 1;
+            //Compute difference based on Registration
+            Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+            Eigen::Matrix3d covarianceMatrix = Eigen::Matrix3d::Zero();
+            double timeToCalculate = 0;
+            // std::cout << "starting Registration: " << std::endl;
+            fsregistration::msg::PotentialSolution3D potentialSolution = this->scanRegistrationObject->
+                registrationOfTwoVoxels3DSOFFTOneSolution(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
+                                                            initialGuess,
+                                                            covarianceMatrix, this->voxel_size, timeToCalculate);
+
+            // std::cout << "finished Registration: " << std::endl;
+            //fine from list the right Solution and the do ICP afterwards.
+
+            double highestPeak = 0;
+            Eigen::Matrix4d currentRegistrationEstimation = Eigen::Matrix4d::Identity();
+
+            Eigen::Quaterniond rotation(potentialSolution.resulting_transformation.orientation.w,
+                                        potentialSolution.resulting_transformation.orientation.x,
+                                        potentialSolution.resulting_transformation.orientation.y,
+                                        potentialSolution.resulting_transformation.orientation.z);
+
+            currentRegistrationEstimation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
+            currentRegistrationEstimation.block<3, 1>(0, 3) = Eigen::Vector3d(
+                potentialSolution.resulting_transformation.position.x,
+                potentialSolution.resulting_transformation.position.y,
+                potentialSolution.resulting_transformation.position.z);
+
+            // std::cout << "our match after FS3D" << std::endl;
+            // std::cout << currentRegistrationEstimation << std::endl;
+
+            free(voxelData1);
+            free(voxelData2);
+
+
+            //fine alignment if ICP should be used
+            if (registrationMethod=="fs3d32IGICP"||registrationMethod=="fs3d64IGICP"|| registrationMethod=="fs3d128IGICP") {
+                double fitnessScore;
+                Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
+                // std::cout << "starting ICP" << std::endl;
+                // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+
+                Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->icpRegistration(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+                currentRegistrationEstimation = resultingICPRegistration;
+                // std::cout << "our match before ICP" << std::endl;
+                // std::cout << initialGuess << std::endl;
+                // std::cout << "our match after ICP" << std::endl;
+                // std::cout << resultingICPRegistration << std::endl;
+            }
+            if (registrationMethod=="fs3d32IGGICP"||registrationMethod=="fs3d64IGGICP"|| registrationMethod=="fs3d128IGGICP") {
+                double fitnessScore;
+                Eigen::Matrix4d initialGuess = currentRegistrationEstimation;
+                // Eigen::Matrix4d initialGuess = Eigen::Matrix4d::Identity();
+
+                // std::cout << "starting ICP" << std::endl;
+                // std::cout << initialGuess << std::endl;
+                // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+
+
+                Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+                // std::cout << "our match after GICP" << std::endl;
+                // std::cout << resultingICPRegistration << std::endl;
+                currentRegistrationEstimation = resultingICPRegistration;
+            }
+            finalTransformation = currentRegistrationEstimation;
+        }
+
 
     }
 public:

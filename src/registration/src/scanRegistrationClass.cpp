@@ -531,7 +531,7 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
 }
 
 std::vector<fsregistration::msg::PotentialSolution2D>
-scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
@@ -638,7 +638,7 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
 }
 
 std::vector<fsregistration::msg::PotentialSolution3D>
-scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
@@ -694,7 +694,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSoluations(double voxelD
 
     request->size_of_voxel = cellSize;
     request->level_potential_rotation = 0.01;
-    request->level_potential_translation = 0.1;
+    request->level_potential_translation = 0.01;
     request->r_min = this->sizeVoxelData/8;
     request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
     request->dimension_size = this->sizeVoxelData;
@@ -737,9 +737,85 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSoluations(double voxelD
 
     std::cout<<"returning result Transformations"<<std::endl;
     return ourListOfResults;
-
 }
 
+fsregistration::msg::PotentialSolution3D
+scanRegistrationClass::registrationOfTwoVoxels3DSOFFTOneSolution(double voxelData1Input[],double maximumVoxel1,
+                                                                 double voxelData2Input[],double maximumVoxel2,
+                                                                 Eigen::Matrix4d initialGuess,
+                                                                 Eigen::Matrix3d &covarianceMatrix,
+                                                                 double cellSize,double &timeToCalculate) {
+
+
+
+
+    auto request = std::make_shared<fsregistration::srv::RequestOnePotentialSolution3D::Request>();
+    double overallMax = std::max(maximumVoxel1,maximumVoxel2);
+//    fs2d::srv::RequestOnePotentialSolution::Request request;
+    std::cout<<"sonar Size VoxelSize: "<< this->sizeVoxelData <<std::endl;
+    std::cout<<"overallMax: "<< overallMax <<std::endl;
+    for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData*this->sizeVoxelData ; i++){
+        double resultingInput1 = voxelData1Input[i]/overallMax;
+        double resultingInput2 = voxelData2Input[i]/overallMax;
+        request->sonar_scan_1.push_back(resultingInput1);
+        request->sonar_scan_2.push_back(resultingInput2);
+    }
+
+
+
+    geometry_msgs::msg::Pose poseMsg;
+
+    Eigen::Quaterniond quaternionInitGuess;
+    Eigen::Vector3d translationInitGuess;
+    generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(translationInitGuess, quaternionInitGuess,
+                                                                 initialGuess);
+
+    poseMsg.position.x = translationInitGuess.x();
+    poseMsg.position.y = translationInitGuess.y();
+    poseMsg.position.z = translationInitGuess.z();
+
+    poseMsg.orientation.x = quaternionInitGuess.x();
+    poseMsg.orientation.y = quaternionInitGuess.y();
+    poseMsg.orientation.z = quaternionInitGuess.z();
+    poseMsg.orientation.w = quaternionInitGuess.w();
+
+
+    request->size_of_voxel = cellSize;
+    request->level_potential_rotation = 0.01;
+    request->level_potential_translation = 0.001;
+    request->r_min = this->sizeVoxelData/8;
+    request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
+    request->dimension_size = this->sizeVoxelData;
+     request->debug = false;
+     request->timing_computation_duration = false;
+     request->use_clahe = true;
+     request->set_normalization = 1;
+     request->set_r_manual = true;
+
+    // std::cout<<"request done, now we want to send it  "<<std::endl;
+    fsregistration::msg::PotentialSolution3D ourResult;
+
+    auto future2 = this->onePotentialClient3D->async_send_request(request);
+    // std::cout<<"Send request. "<<std::endl;
+    Eigen::Matrix4d resultingTransformation;
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+        // std::cout<<"result is here now. "<<std::endl;
+        // Wait for the result.
+        try {
+            auto response = future2.get();
+            ourResult = response->potential_solution;
+
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Service call failed.");
+        }
+    }
+
+
+    // std::cout<<"returning result Transformations"<<std::endl;
+    return ourResult;
+}
 
 //Eigen::Matrix4d
 //scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],

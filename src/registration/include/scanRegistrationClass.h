@@ -130,8 +130,8 @@ public:
                 "fsregistration/registration/all_solutions");
         this->listPotentialClient3D = this->create_client<fsregistration::srv::RequestListPotentialSolution3D>(
         "fs3D/registration/all_solutions");
-//         this->onePotentialClient3D = this->create_client<fsregistration::srv::RequestOnePotentialSolution3D>(
-// "fsregistration/registration/all_solutions");
+        this->onePotentialClient3D = this->create_client<fsregistration::srv::RequestOnePotentialSolution3D>(
+"fs3D/registration/one_solution");
 
     }
 
@@ -199,17 +199,22 @@ public:
                                                      Eigen::Matrix3d &covarianceMatrix,
                                                      double cellSize,double &timeToCalculate);
 
-    std::vector<fsregistration::msg::PotentialSolution2D> registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+    std::vector<fsregistration::msg::PotentialSolution2D> registrationOfTwoVoxelsSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
                                                                                   double voxelData2Input[],double maximumVoxel2,
                                                                                   Eigen::Matrix4d initialGuess,
                                                                                   Eigen::Matrix3d &covarianceMatrix,
                                                                                   double cellSize,double &timeToCalculate);
 
-    std::vector<fsregistration::msg::PotentialSolution3D> registrationOfTwoVoxels3DSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+    std::vector<fsregistration::msg::PotentialSolution3D> registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
                                                                  double cellSize,double &timeToCalculate);
+    fsregistration::msg::PotentialSolution3D registrationOfTwoVoxels3DSOFFTOneSolution(double voxelData1Input[],double maximumVoxel1,
+                                                             double voxelData2Input[],double maximumVoxel2,
+                                                             Eigen::Matrix4d initialGuess,
+                                                             Eigen::Matrix3d &covarianceMatrix,
+                                                             double cellSize,double &timeToCalculate);
 
     // Eigen::Matrix4d registrationFourerMellin(double voxelData1Input[],
     //                                          double voxelData2Input[],
@@ -236,7 +241,7 @@ private:
     rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution2D>::SharedPtr onePotentialClient2D;
     rclcpp::Client<fsregistration::srv::RequestListPotentialSolution2D>::SharedPtr listPotentialClient2D;
     rclcpp::Client<fsregistration::srv::RequestListPotentialSolution3D>::SharedPtr listPotentialClient3D;
-    // rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution3D>::SharedPtr onePotentialClient3D;
+    rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution3D>::SharedPtr onePotentialClient3D;
     int sizeVoxelData;
 
     std::mutex *icpMutex,*ndtd2dMutex,*ndtp2dMutex,*fourierMellinMutex,*oursMutex,*featureBasedMutex,*gmmd2dMutex,*gmmp2dMutex;
