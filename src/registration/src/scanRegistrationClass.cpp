@@ -642,7 +642,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelDa
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
-                                                                 double cellSize,double &timeToCalculate) {
+                                                                 double cellSize,double &timeToCalculate,double level_potential_translation) {
 
 
 
@@ -694,7 +694,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelDa
 
     request->size_of_voxel = cellSize;
     request->level_potential_rotation = 0.01;
-    request->level_potential_translation = 0.01;
+    request->level_potential_translation = level_potential_translation;
     request->r_min = this->sizeVoxelData/8;
     request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
     request->dimension_size = this->sizeVoxelData;
@@ -703,6 +703,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelDa
      request->use_clahe = true;
      request->set_normalization = 1;
      request->set_r_manual = true;
+
 
     // std::cout<<"request done, now we want to send it  "<<std::endl;
     std::vector<fsregistration::msg::PotentialSolution3D> ourListOfResults;
@@ -744,7 +745,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTOneSolution(double voxelDat
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
-                                                                 double cellSize,double &timeToCalculate) {
+                                                                 double cellSize,double &timeToCalculate,double level_potential_translation) {
 
 
 
@@ -782,7 +783,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTOneSolution(double voxelDat
 
     request->size_of_voxel = cellSize;
     request->level_potential_rotation = 0.01;
-    request->level_potential_translation = 0.001;
+    request->level_potential_translation = level_potential_translation;
     request->r_min = this->sizeVoxelData/8;
     request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
     request->dimension_size = this->sizeVoxelData;
@@ -791,6 +792,7 @@ scanRegistrationClass::registrationOfTwoVoxels3DSOFFTOneSolution(double voxelDat
      request->use_clahe = true;
      request->set_normalization = 1;
      request->set_r_manual = true;
+
 
     // std::cout<<"request done, now we want to send it  "<<std::endl;
     fsregistration::msg::PotentialSolution3D ourResult;

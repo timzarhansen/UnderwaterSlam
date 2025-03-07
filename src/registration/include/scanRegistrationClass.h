@@ -209,12 +209,12 @@ public:
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
-                                                                 double cellSize,double &timeToCalculate);
+                                                                 double cellSize,double &timeToCalculate,double level_potential_translation);
     fsregistration::msg::PotentialSolution3D registrationOfTwoVoxels3DSOFFTOneSolution(double voxelData1Input[],double maximumVoxel1,
                                                              double voxelData2Input[],double maximumVoxel2,
                                                              Eigen::Matrix4d initialGuess,
                                                              Eigen::Matrix3d &covarianceMatrix,
-                                                             double cellSize,double &timeToCalculate);
+                                                             double cellSize,double &timeToCalculate,double level_potential_translation);
 
     // Eigen::Matrix4d registrationFourerMellin(double voxelData1Input[],
     //                                          double voxelData2Input[],

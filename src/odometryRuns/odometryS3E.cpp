@@ -64,6 +64,7 @@ public:
         this->declare_parameter<std::string>("gt_topic_name", "/Alpha/gt_xyz");
         this->declare_parameter<int>("time_until_save", 1);
         this->declare_parameter<std::string>("which_registration", "ICP");
+        this->declare_parameter<double>("level_potential_translation", 0.1);
         this->declare_parameter<double>("scan_radius_max", 25.0);
 
         this->which_registration = this->get_parameter("which_registration").as_string();
@@ -72,6 +73,8 @@ public:
          std::cout << "number_of_skips: " << this->number_of_skips << std::endl;
         this->pcl_topic_name= this->get_parameter("pcl_topic_name").as_string();
          std::cout << "pcl_topic_name: " << this->pcl_topic_name << std::endl;
+        this->level_potential_translation= this->get_parameter("level_potential_translation").as_double();
+        std::cout << "level_potential_translation: " << this->level_potential_translation << std::endl;
         this->pose_topic_name= this->get_parameter("pose_topic_name").as_string();
          std::cout << "pose_topic_name: " << this->pose_topic_name << std::endl;
         this->gt_topic_name= this->get_parameter("gt_topic_name").as_string();
@@ -175,7 +178,7 @@ this->which_registration=="fs3d128IG"||this->which_registration=="fs3d128IGICP"|
         if (this->pcl_topic_name=="/Carol/velodyne_points") {
             whichRobot = "Carol";
         }
-        this->folderForSaving = std::string(this->which_registration+"_"+std::to_string(this->number_of_skips)+"_"+std::to_string(this->scan_radius_max)+"_"+whichRobot);
+        this->folderForSaving = std::string(this->which_registration+"_"+std::to_string(this->number_of_skips)+"_"+std::to_string(this->scan_radius_max)+"_"+std::to_string(level_potential_translation)+"_"+whichRobot);
         std::cout << "endet initilization" << std::endl;
     }
 
@@ -226,6 +229,7 @@ private:
     double time_until_save;
     std::string which_registration;
     double scan_radius_max;
+    double level_potential_translation;
     double voxel_size;
     std::chrono::steady_clock::time_point time_last_pointcloud;
     // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -720,7 +724,7 @@ private:
             std::vector<fsregistration::msg::PotentialSolution3D> potentialSolutionsList = this->scanRegistrationObject->
                 registrationOfTwoVoxels3DSOFFTAllSolutions(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
                                                             initialGuess,
-                                                            covarianceMatrix, this->voxel_size, timeToCalculate);
+                                                            covarianceMatrix, this->voxel_size, timeToCalculate,this->level_potential_translation);
 
             // std::cout << "finished Registration: " << std::endl;
             //fine from list the right Solution and the do ICP afterwards.
@@ -839,7 +843,7 @@ private:
             fsregistration::msg::PotentialSolution3D potentialSolution = this->scanRegistrationObject->
                 registrationOfTwoVoxels3DSOFFTOneSolution(voxelData1, maximumVoxelData,voxelData2, maximumVoxelData,
                                                             initialGuess,
-                                                            covarianceMatrix, this->voxel_size, timeToCalculate);
+                                                            covarianceMatrix, this->voxel_size, timeToCalculate,this->level_potential_translation);
 
             // std::cout << "finished Registration: " << std::endl;
             //fine from list the right Solution and the do ICP afterwards.
