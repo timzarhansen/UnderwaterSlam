@@ -18,6 +18,8 @@
 //#include "generalHelpfulTools.h"
 #include "scanRegistrationClass.h"
 
+
+
 #ifndef SIMULATION_BLUEROV_SLAMTOOLSROS_H
 #define SIMULATION_BLUEROV_SLAMTOOLSROS_H
 
@@ -52,6 +54,11 @@ struct DvlData {
 struct intensityValues {
     Eigen::Matrix4d transformation;
     intensityMeasurement intensity;
+    int type;
+};
+struct pclValues {
+    Eigen::Matrix4d transformation;
+    pcl::PointCloud<pcl::PointXYZ> pointCloud;
     int type;
 };
 struct transformationStamped {
@@ -102,7 +109,7 @@ public:
                                     std::deque<transformationStamped> &transformationList,
                                     std::mutex &mutexForAccess);
     static Eigen::Matrix4d
-    calculatePoseBetweenPosesInterpolation( double timeToAdd,
+    calculatePoseBetweenPosesInterpolation(double timeToAdd,
                                                           std::deque<transformationStamped> &transformationList,
                                                           std::mutex &mutexForAccess);
 
@@ -198,13 +205,20 @@ public:
     convertVoxelToPointcloud(double voxelData[], double thresholdFactor, double maximumVoxelData, int dimensionVoxel,
                              double dimensionOfVoxelDataForMatching);
 
-    static Eigen::Matrix4d registrationOfDesiredMethod(pcl::PointCloud<pcl::PointXYZ> pclNotShifted,
-                                                              pcl::PointCloud<pcl::PointXYZ> pclShifted,
-                                                              pcl::PointCloud<pcl::PointXYZ> final, double voxelData[],
-                                                              double voxelDataShifted[],
-                                                              Eigen::Matrix4d initialGuess, double currentCellSize,
-                                                              int whichMethod, bool useInitialGuess,
-                                                              scanRegistrationClass *scanRegistrationObject,double &timeToCalculate);
+    // static Eigen::Matrix4d registrationOfDesiredMethod(pcl::PointCloud<pcl::PointXYZ> pclNotShifted,
+    //                                                           pcl::PointCloud<pcl::PointXYZ> pclShifted,
+    //                                                           pcl::PointCloud<pcl::PointXYZ> final, double voxelData[],
+    //                                                           double voxelDataShifted[],
+    //                                                           Eigen::Matrix4d initialGuess, double currentCellSize,
+    //                                                           int whichMethod, bool useInitialGuess,
+    //                                                           scanRegistrationClass *scanRegistrationObject,double &timeToCalculate);
+
+    static void convertPointToVoxel(const pcl::PointCloud<pcl::PointXYZ>& pointcloud, double voxelData[], int N,
+                                       double voxelSizeX, double voxelSizeY, double voxelSizeZ, const pcl::PointXYZ& shift);
+    static void getDatasetFromGraphforPoseArray(std::vector<Eigen::Matrix4d>& dataSet, graphSlamSaveStructure& graphSaved,
+                                            std::mutex& graphSlamMutex);
+    static void getDatasetFromGraphforGroundTruthArray(std::vector<Eigen::Matrix4d>& dataSet, graphSlamSaveStructure& graphSaved,
+                                        std::mutex& graphSlamMutex);
 
 
 };

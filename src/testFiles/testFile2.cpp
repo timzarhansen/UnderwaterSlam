@@ -1,141 +1,155 @@
-/*
- ********************************************************************
- * This file is:                                                    *
- *     2022 Pau Vial @ VICOROB-UdG, Girona, Catalonia               *
- *     2022 Miguel Malagon @ VICOROB-UdG, Girona, Catalonia         *
- *                                                                  *
- * This file is part of GmmRegistration' library, a C++ library     *
- * for acoustic point cloud registration for robotic perception.    *
- *                                                                  *
- * GmmRegistration is free software: you can redistribute it and/or *
- * modify it under the terms of the GNU General Public License as   *
- * published by the Free Software Foundation, either version 3 of   *
- * the License, or (at your option) any later version.              *
- *                                                                  *
- * GmmRegistration is distributed in the hope that it will be       *
- * useful, but WITHOUT ANY WARRANTY; without even the implied       *
- * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. *
- * See the GNU General Public License for more details.             *
- *                                                                  *
- * You should have received a copy of the GNU General Public        *
- * License along with this program.  If not, see                    *
- * <https://www.gnu.org/licenses/>.                                 *
- *                                                                  *
- * GmmRegistration is:                                              *
- *     2022 Pau Vial @ Institut VICOROB                             *
- *     Universitat de Girona                                        *
- *     Girona, Catalonia                                            *
- *     Copyright (c) 2021-2023 Pau Vial. All rights reserved.       *
- ********************************************************************
- */
-
-/**
- * @file example_p2d_2d.cpp
- * @brief Two-dimensional example for the Points to Distribution point cloud registration method
- * @author Pau Vial
- */
-/**
- * A simple 2D Points to Distribution registration example
- *  - The scan is a line generated with random noise
- *  - We give an specific transformation in order to have a ground truth
- *  - The gmm are generated with ndt_constructor giving 2 units cell size and a minimum of 3 points per component
- *  - The components are corrected to have a 0.1 minimum ratio between covvariance eigen values
- *  - We solve using the CholeskyLineSearchNewtonMethod solver with its default parameters
- */
-
-#include <gmm_registration/eigen_fix.h>
+#include <rclcpp/rclcpp.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/registration/gicp.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <Eigen/Dense>
-#include <Eigen/Core>
-
-#include <vector>
-#include <time.h>
+#include <cmath>
 #include <iostream>
-
-#include <gmm_registration/front_end/GmmFrontEnd.hpp>
-#include <gmm_registration/front_end/GaussianMixturesModel.h>
-#include <gmm_registration/method/ScanMatchingMethods.h>
-#include <gmm_registration/method/PointsToDistribution2D.h>
-#include <gmm_registration/solver/Solver.h>
-#include <gmm_registration/solver/CholeskyLineSearchNewtonMethod.h>
+#include <filesystem>
 
 using namespace std;
+using namespace pcl;
 
-int main(int argc, char** argv)
-{
-    // Ground truth transformation to apply on the scan as (translation_x,translation_y,rotation)
-    Eigen::Vector3d t1;
-    // t1 << 0.1, 0.25, -0.15;
-    t1 << 0.8, -0.6, 0.3;
-    Eigen::Matrix3d T = se_exp_map(t1);
+class MinimalClientAsync : public rclcpp::Node {
+public:
+    using RequestListPotentialSolution3D = rcl_interfaces::srv::RequestListPotentialSolution3D;
 
-    //////////////////
-    // IMPORT SCAN
-
-    // Go through the file with the scan to get its length
-    string path = std::getenv("GMM_REGISTRATION_PATH");
-    string scan_file = path + "/data/scan_5.xyz";
-    ifstream fin(scan_file);
-    double x, y, z;
-    int len = 0;
-    while (fin >> x >> y >> z)
-    {
-        len++;
+    MinimalClientAsync(const std::string& node_name)
+        : Node("client_" + node_name), cli(create_client<RequestListPotentialSolution3D>("fs3D/registration/all_solutions")) {
+        while (!cli->wait_for_service(1s)) {
+            RCLCPP_INFO(get_logger(), "service not available, waiting again...");
+        }
     }
 
-    // Read scan from file
-    vector<Eigen::Vector2d> current_scan(len);
-    vector<Eigen::Vector2d> reference_scan(current_scan.size());
-    int i = 0;
-    ifstream fin2(scan_file);
-    while (fin2 >> x >> y >> z)
-    {
-        current_scan[i] << x, y;
-        reference_scan[i] = (T * (Eigen::Vector3d() << current_scan[i](0), current_scan[i](1), 1).finished()).head(2);
-        i++;
+    RequestListPotentialSolution3D::Response::SharedPtr send_request(
+        const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& scan1,
+        const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& scan2,
+        int N, float VoxelSize, bool use_clahe, int r_min, int r_max, bool set_r_manual,
+        float level_potential_rotation, float level_potential_translation, float normalization_factor) {
+        
+        auto request = std::make_shared<RequestListPotentialSolution3D::Request>();
+        request->size_of_voxel = VoxelSize;
+        request->dimension_size = N;
+        request->sonar_scan_1 = scan1->toVector3fArray();
+        request->sonar_scan_2 = scan2->toVector3fArray();
+        request->use_clahe = use_clahe;
+        request->r_min = r_min;
+        request->r_max = r_max;
+        request->level_potential_rotation = level_potential_rotation;
+        request->level_potential_translation = level_potential_translation;
+        request->set_normalization = normalization_factor;
+        request->set_r_manual = set_r_manual;
+
+        auto result = cli->async_send_request(request);
+        return result.get();
     }
 
-    /*
-    //////////////////
-    // GENERATE SYNTHETIC SCAN
+private:
+    rclcpp::Client<RequestListPotentialSolution3D>::SharedPtr cli;
+};
 
-    // Generation of the current scan as two lines with noise forming a 90 degree corner
-    srand((unsigned)time(NULL));
-    vector<Eigen::Vector2d> current_scan(40);
-    vector<Eigen::Vector2d> reference_scan(current_scan.size());
-    for(int i = 0; i<current_scan.size(); i++){
-        current_scan[i] << 0.25*i + 0.1*(double)rand()/RAND_MAX - 0.05, 1 + 0.1*(double)rand()/RAND_MAX - 0.05;
-        if(i>=20) current_scan[i] <<  0.1*(double)rand()/RAND_MAX - 0.05, 0.25*(i-19) + 1 + 0.1*(double)rand()/RAND_MAX -
-    0.05; reference_scan[i] = rot * current_scan[i] + t1.head(2);
+int main(int argc, char** argv) {
+    rclcpp::init(argc, argv);
+
+    auto minimal_client = std::make_shared<MinimalClientAsync>("myRandomName");
+    RCLCPP_INFO(minimal_client->get_logger(), "Testing IO for point clouds ...");
+
+    int whichScan1 = 0;
+    int whichScan2 = 0;
+
+    for (int i = 0; i < 20; ++i) {
+        PointCloud<pcl::PointXYZRGB>::Ptr pcd1(new PointCloud<pcl::PointXYZRGB>);
+        PointCloud<pcl::PointXYZRGB>::Ptr pcd2(new PointCloud<pcl::PointXYZRGB>);
+
+        if (pcl::io::loadPLYFile<pcl::PointXYZRGB>(
+                std::filesystem::path("/home/tim-external/dataFolder/pointclouds/PointcloudAlpha_") / 
+                std::format("{:05d}.ply", whichScan1), *pcd1) == -1 ||
+            pcl::io::loadPLYFile<pcl::PointXYZRGB>(
+                std::filesystem::path("/home/tim-external/dataFolder/pointclouds/PointcloudAlpha_") /
+                std::format("{:05d}.ply", whichScan2), *pcd2) == -1) {
+            RCLCPP_ERROR(minimal_client->get_logger(), "Could not read one of the point clouds.");
+            return -1;
+        }
+
+        Eigen::Matrix4f T = Eigen::Matrix4f::Identity();
+        T(0, 3) = 1.1;
+        T.block<3, 3>(0, 0) = Eigen::AngleAxisf(i * 0.2, Eigen::Vector3f::UnitZ()).toRotationMatrix();
+
+        pcd2->transform(T);
+        RCLCPP_INFO(minimal_client->get_logger(), "Transformation Matrix GT: ");
+        std::cout << T << std::endl;
+
+        int N = 64;
+        float maxDistance = 20.0f;
+        float voxelSize = (2 * maxDistance * 1.5) / N;
+
+        Eigen::Vector4f mean1, mean2;
+        pcl::compute3DCentroid(*pcd1, mean1);
+        pcl::compute3DCentroid(*pcd2, mean2);
+
+        VoxelGrid<pcl::PointXYZRGB> voxel_grid;
+        voxel_grid.setLeafSize(voxelSize, voxelSize, voxelSize);
+        PointCloud<pcl::PointXYZRGB>::Ptr pcd1_vox(new PointCloud<pcl::PointXYZRGB>);
+        PointCloud<pcl::PointXYZRGB>::Ptr pcd2_vox(new PointCloud<pcl::PointXYZRGB>);
+        voxel_grid.setInputCloud(pcd1);
+        voxel_grid.filter(*pcd1_vox);
+        voxel_grid.setInputCloud(pcd2);
+        voxel_grid.filter(*pcd2_vox);
+
+        bool use_clahe = true;
+        int r_min = N / 8;
+        int r_max = N / 2 - N / 8;
+        bool set_r_manual = true;
+        float level_potential_rotation = 0.01f;
+        float level_potential_translation = 0.1f;
+        float normalization_factor = 1.0f;
+
+        auto response = minimal_client->send_request(pcd1_vox, pcd2_vox, N, voxelSize, use_clahe, r_min, r_max, set_r_manual,
+                                                     level_potential_rotation, level_potential_translation, normalization_factor);
+
+        float highestPeak = 0.0f;
+        int indexHighestPeak = 0;
+
+        for (size_t index = 0; index < response->list_potential_solutions.size(); ++index) {
+            if (response->list_potential_solutions[index].transformation_peak_height > highestPeak) {
+                highestPeak = response->list_potential_solutions[index].transformation_peak_height;
+                indexHighestPeak = index;
+            }
+        }
+
+        auto peak = response->list_potential_solutions[indexHighestPeak];
+        Eigen::Quaternionf currentQuaternion(
+            peak.resulting_transformation.orientation.w,
+            peak.resulting_transformation.orientation.x,
+            peak.resulting_transformation.orientation.y,
+            peak.resulting_transformation.orientation.z
+        );
+
+        Eigen::Matrix4f resultingTransformation = Eigen::Matrix4f::Identity();
+        resultingTransformation.block<3, 3>(0, 0) = currentQuaternion.toRotationMatrix();
+        resultingTransformation(0, 3) = peak.resulting_transformation.position.x;
+        resultingTransformation(1, 3) = peak.resulting_transformation.position.y;
+        resultingTransformation(2, 3) = peak.resulting_transformation.position.z;
+
+        RCLCPP_INFO(minimal_client->get_logger(), "ICP transformation: ");
+        GeneralizedIterativeClosestPoint<pcl::PointXYZRGB, pcl::PointXYZRGB> gicp;
+        gicp.setMaximumIterations(50);
+        gicp.setTransformationEpsilon(1e-8);
+        gicp.setEuclideanFitnessEpsilon(1);
+
+        PointCloud<pcl::PointXYZRGB>::Ptr final(new PointCloud<pcl::PointXYZRGB>);
+        gicp.setInputSource(pcd1_vox);
+        gicp.setInputTarget(pcd2_vox);
+        gicp.align(*final, resultingTransformation);
+        std::cout << "ICP transformation: \n" << gicp.getFinalTransformation() << std::endl;
+
+        RCLCPP_INFO(minimal_client->get_logger(), "next");
     }
-    */
 
-    //////////////////
-    // REGISTER
-
-    // Generate a GMM out of the reference scan
-    shared_ptr<GaussianMixturesModel<2>> gmm;
-    // gmm = ndt_constructor(reference_scan,3,3);
-    // gmm = k_means_constructor(reference_scan,4);
-    // gmm = em_constructor(reference_scan,4);
-    gmm = bayesian_gmm_constructor(reference_scan, 10);
-    gmm->balance_covariances(0.05);
-    gmm->plot_components_density(0, reference_scan, true);
-
-    // Set both the GMM and the scan to a P2D method
-    shared_ptr<PointsToDistribution2D> method(
-            new PointsToDistribution2D(gmm, make_shared<std::vector<Eigen::Vector2d>>(current_scan)));
-    // method->set_cpu_threads(6);
-
-    // Set the method to the solver with its needed parameters
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-
-    // Solve the registration problem starting with a zero seed
-    solver->compute_optimum();
-    solver->plot_process(0, true);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-
-    gmm.reset();
-    method.reset();
-    solver.reset();
+    rclcpp::shutdown();
+    return 0;
 }

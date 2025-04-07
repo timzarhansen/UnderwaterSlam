@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import NavSatFix
+# from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseArray
+import pyproj
+import numpy as np
+from rclpy.qos import QoSProfile, HistoryPolicy, ReliabilityPolicy, DurabilityPolicy, LivelinessPolicy
+
+
+class GpsToXYZNode(Node):
+    def __init__(self):
+        super().__init__('gps_to_xyz_node')
+
+        qos_profile = QoSProfile(
+            depth=100,  # Set the depth of the message queue
+            history=HistoryPolicy.KEEP_ALL,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.SYSTEM_DEFAULT,
+            liveliness=LivelinessPolicy.SYSTEM_DEFAULT
+        )
+
+
+
+
+        self.subscriptionAlpha = self.create_subscription(
+            NavSatFix,
+            '/Alpha/fix',
+            self.gps_callbackAlpha,
+            qos_profile)
+        self.subscriptionBob = self.create_subscription(
+            NavSatFix,
+            '/Bob/fix',
+            self.gps_callbackBob,
+            qos_profile)
+        self.subscriptionCarol = self.create_subscription(
+            NavSatFix,
+            '/Carol/fix',
+            self.gps_callbackCarol,
+            qos_profile)
+        # self.publisher1_ = self.create_publisher(PoseStamped, '/Alpha/xyz_topic', 10)
+        self.publisherAlphaArray_ = self.create_publisher(PoseArray, '/Alpha/gt_xyzArray', qos_profile)
+        self.publisherBobArray_ = self.create_publisher(PoseArray, '/Bob/gt_xyzArray', qos_profile)
+        self.publisherCarolArray_ = self.create_publisher(PoseArray, '/Carol/gt_xyzArray', qos_profile)
+
+        self.publisherAlpha_ = self.create_publisher(PoseStamped, '/Alpha/gt_xyz', qos_profile)
+        self.publisherBob_ = self.create_publisher(PoseStamped, '/Bob/gt_xyz', qos_profile)
+        self.publisherCarol_ = self.create_publisher(PoseStamped, '/Carol/gt_xyz', qos_profile)
+
+        self.transformer = pyproj.Transformer.from_crs("epsg:4326", "epsg:3857")
+        self.beginningPoseAlpha = np.array([0.0, 0.0, 0.0])
+        self.beginningPoseBob = np.array([0.0, 0.0, 0.0])
+        self.beginningPoseCarol = np.array([0.0, 0.0, 0.0])
+        self.poseArrayAlpha = PoseArray()
+        self.poseArrayAlpha.header.frame_id = "world"
+        self.poseArrayBob = PoseArray()
+        self.poseArrayBob.header.frame_id = "world"
+        self.poseArrayCarol = PoseArray()
+        self.poseArrayCarol.header.frame_id = "world"
+        self.firstGPSMessageAlpha = True
+        self.firstGPSMessageBob = True
+        self.firstGPSMessageCarol = True
+
+    def gpsConversion(self, msg):
+        latitude = msg.latitude
+        longitude = msg.longitude
+        altitude = msg.altitude
+
+        # Convert from WGS84 (EPSG:4326) to Web Mercator (EPSG:3857)
+        x, y = self.transformer.transform(latitude, longitude)
+        return x,y,altitude
+
+
+    def gps_callbackAlpha(self, msg):
+        x ,y,altitude = self.gpsConversion(msg)
+
+        if self.firstGPSMessageAlpha:
+            self.beginningPoseAlpha = np.array([x, y, altitude])
+            self.firstGPSMessageAlpha = False
+        else:
+            point_msg = PoseStamped()
+            point_msg.pose.position.x = x-self.beginningPoseAlpha[0]
+            point_msg.pose.position.y = y-self.beginningPoseAlpha[1]
+            point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
+            point_msg.pose.orientation.w = 1.0
+
+            point_msg.header.stamp = msg.header.stamp
+            point_msg.header.frame_id = "world"
+
+            self.poseArrayAlpha.poses.append(point_msg.pose)
+            self.poseArrayAlpha.header.stamp = msg.header.stamp
+            self.publisherAlphaArray_.publish(self.poseArrayAlpha)
+            self.publisherAlpha_.publish(point_msg)
+
+    def gps_callbackBob(self, msg):
+        x ,y,altitude = self.gpsConversion(msg)
+
+        if self.firstGPSMessageBob:
+            self.beginningPoseBob = np.array([x, y, altitude])
+            self.firstGPSMessageBob = False
+        else:
+            point_msg = PoseStamped()
+            point_msg.pose.position.x = x-self.beginningPoseBob[0]
+            point_msg.pose.position.y = y-self.beginningPoseBob[1]
+            point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
+            point_msg.pose.orientation.w = 1.0
+
+            point_msg.header.stamp = msg.header.stamp
+            point_msg.header.frame_id = "world"
+
+            self.poseArrayBob.poses.append(point_msg.pose)
+            self.poseArrayBob.header.stamp = msg.header.stamp
+            self.publisherBobArray_.publish(self.poseArrayBob)
+            self.publisherBob_.publish(point_msg)
+    def gps_callbackCarol(self, msg):
+        x ,y,altitude = self.gpsConversion(msg)
+
+        if self.firstGPSMessageCarol:
+            self.beginningPoseCarol = np.array([x, y, altitude])
+            self.firstGPSMessageCarol = False
+        else:
+            point_msg = PoseStamped()
+            point_msg.pose.position.x = x-self.beginningPoseCarol[0]
+            point_msg.pose.position.y = y-self.beginningPoseCarol[1]
+            point_msg.pose.position.z = 0.0#altitude-self.beginningPose[2]
+            point_msg.pose.orientation.w = 1.0
+
+            point_msg.header.stamp = msg.header.stamp
+            point_msg.header.frame_id = "world"
+
+            self.poseArrayCarol.poses.append(point_msg.pose)
+            self.poseArrayCarol.header.stamp = msg.header.stamp
+            self.publisherCarolArray_.publish(self.poseArrayCarol)
+            self.publisherCarol_.publish(point_msg)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = GpsToXYZNode()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

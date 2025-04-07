@@ -1,151 +1,84 @@
-/*
- ********************************************************************
- * This file is:                                                    *
- *     2022 Pau Vial @ VICOROB-UdG, Girona, Catalonia               *
- *     2022 Miguel Malagon @ VICOROB-UdG, Girona, Catalonia         *
- *                                                                  *
- * This file is part of GmmRegistration' library, a C++ library     *
- * for acoustic point cloud registration for robotic perception.    *
- *                                                                  *
- * GmmRegistration is free software: you can redistribute it and/or *
- * modify it under the terms of the GNU General Public License as   *
- * published by the Free Software Foundation, either version 3 of   *
- * the License, or (at your option) any later version.              *
- *                                                                  *
- * GmmRegistration is distributed in the hope that it will be       *
- * useful, but WITHOUT ANY WARRANTY; without even the implied       *
- * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. *
- * See the GNU General Public License for more details.             *
- *                                                                  *
- * You should have received a copy of the GNU General Public        *
- * License along with this program.  If not, see                    *
- * <https://www.gnu.org/licenses/>.                                 *
- *                                                                  *
- * GmmRegistration is:                                              *
- *     2022 Pau Vial @ Institut VICOROB                             *
- *     Universitat de Girona                                        *
- *     Girona, Catalonia                                            *
- *     Copyright (c) 2021-2023 Pau Vial. All rights reserved.       *
- ********************************************************************
- */
-
-/**
- * @file example_d2d_2d.cpp
- * @brief Two-dimensional example for the Distribution to Distribution point cloud registration method
- * @author Pau Vial
- */
-
-/**
- * A simple 2D Distribution to Distribution registration example
- *  - The scan is a line generated with random noise
- *  - We give an specific transformation in order to have a ground truth
- *  - The gmm are generated with ndt_constructor giving 2 units cell size and a minimum of 3 points per component
- *  - The components are corrected to have a 0.1 minimum ratio between covvariance eigen values
- *  - We solve using the CholeskyLineSearchNewtonMethod solver with its default parameters
- */
-
-#include <gmm_registration/eigen_fix.h>
-#include <Eigen/Dense>
-#include <Eigen/Core>
-
-#include <vector>
-#include <time.h>
-#include <iostream>
-
-#include <gmm_registration/front_end/GmmFrontEnd.hpp>
-#include <gmm_registration/front_end/GaussianMixturesModel.h>
-#include <gmm_registration/method/ScanMatchingMethods.h>
-#include <gmm_registration/method/DistributionToDistribution2D.h>
-#include <gmm_registration/solver/Solver.h>
-#include <gmm_registration/solver/CholeskyLineSearchNewtonMethod.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/point cloud.h>
+#include <pcl/point cloud/transform.h>
+#include <pcl/registration/icp.h>
+#include <pcl/voxelization/voxel_grid.h>
 
 using namespace std;
+using namespace pcl;
 
-int main(int argc, char** argv)
-{
-    // Ground truth transformation to apply on the scan as (translation_x,translation_y,rotation)
-    Eigen::Vector3d t1;
-     t1 << 2.1, 0.25, -2.8;
-//    t1 << 0.8, -0.6, 0.3;
-    Eigen::Matrix3d T = se_exp_map(t1);
+Eigen::Matrix4f createTransformation(float rotationX, float rotationY, float rotationZ, 
+                                       float translationX, float translationY, float translationZ) {
+    Eigen::Affine3f transformation;
+    transformation.translation() = Eigen::Vector3f(translationX, translationY, translationZ);
+    
+   Eigen::Matrix3f R = Eigen::Matrix3f::Identity();
+    
+    // Rotation around X
+    R = R * rotationX * QuaternionType(Rotation2Quat(Eigen::AngleAxisf(rotationX, 
+        (0.0, 1.0, 0.0))));
+    
+   // Rotation around Y
+    R = R * rotationY * Rotation2Quat(Eigen::AngleAxisf(rotationY, 
+        (0.0, 0.0, 1.0)));
+    
+    // Rotation around Z
+    R = R * rotationZ * Rotation2Quat(Eigen::AngleAxisf(rotationZ, 
+        (0.0, 0.0, 0.0), "z")));
+    
+    return transformation.toMatrix();
+}
 
-    //////////////////
-    // IMPORT SCAN
-
-    // Go through the file with the scan to get its length
-    string path = std::getenv("GMM_REGISTRATION_PATH");
-    string scan_file = path + "/data/scan_0.xyz";
-    ifstream fin(scan_file);
-    double x, y, z;
-    int len = 0;
-    while (fin >> x >> y >> z)
-    {
-        len++;
+void pcdToVoxel(pcl::Point Cloud& cloud, int N, float voxelSizeX, float voxelSizeY, float voxelSizeZ) {
+    // Implementation of voxelization
+    vector<vector<vector<float>>> voxels(N * N * N);
+    for (const auto& point : cloud.points) {
+        Eigen::Vector3f pt(point.x, point.y, point.z);
+        
+        int voxIndex = 0;
+        if (voxelSizeX > 0 && voxelSizeY > 0 && voxelSizeZ > 0) {
+            voxIndex = getVoxelIndex(pt[0], pt[1], pt[2], voxelSizeX, N);
+            voxIndex = getDiffVoxelIndex(pt[0], pt[1], pt[2], voxelSizeX, 
+                                         voxelSizeY, voxelSizeZ, N);
+            
+            if (voxelGrid exists at index) {
+                // Add point to corresponding voxel
+            }
+        }
     }
+}
 
-    // Read scan from file
-    vector<Eigen::Vector2d> current_scan(len);
-    vector<Eigen::Vector2d> reference_scan(current_scan.size());
-    int i = 0;
-    ifstream fin2(scan_file);
-    while (fin2 >> x >> y >> z)
-    {
-        current_scan[i] << x, y;
-        reference_scan[i] = (T * (Eigen::Vector3d() << current_scan[i](0), current_scan[i](1), 1).finished()).head(2);
-        i++;
-    }
+Eigen::Matrix4f computeICPTransformation(const PointCloud& cloud1, const PointCloud& cloud2, 
+                                          int maxIterations = 50) {
+    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    icp.setInputSource(cloud1);
+    icp.setInputTarget(cloud2);
+    
+    Eigen::Matrix4f final_transformation = computeTransformation();
+    // ... (rest of ICP implementation)
+    
+    return final_transformation;
+}
 
-    /*
-    //////////////////
-    // GENERATE SYNTHETIC SCAN
+// In your main function:
+int main() {
+    // Read point clouds
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 = pcl::io::loadPLYFile("path_to_cloud1.ply");
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud2 = pcl::io::loadPLYFile("path_to_cloud2.ply");
 
-    // Generation of the current scan as two lines with noise forming a 90 degree corner
-    srand((unsigned)time(NULL));
-    vector<Eigen::Vector2d> current_scan(40);
-    vector<Eigen::Vector2d> reference_scan(current_scan.size());
-    for(int i = 0; i<current_scan.size(); i++){
-        current_scan[i] << 0.25*i + 0.1*(double)rand()/RAND_MAX - 0.05, 1 + 0.1*(double)rand()/RAND_MAX - 0.05;
-        if(i>=20) current_scan[i] <<  0.1*(double)rand()/RAND_MAX - 0.05, 0.25*(i-19) + 1 + 0.1*(double)rand()/RAND_MAX -
-    0.05; reference_scan[i] = rot * current_scan[i] + t1.head(2);
-    }
-    */
+    // Apply transformation (if any)
+    Eigen::Matrix4f T;
+    // ... set up your transformation
 
-    //////////////////
-    // REGISTER
+    // Voxelization
+    pcdToVoxel(cloud1, N, voxelSizeX, voxelSizeY, voxelSizeZ);
 
-    // Generate a GMM out of the reference scan
-    shared_ptr<GaussianMixturesModel<2>> reference_gmm;
-    // reference_gmm = ndt_constructor(reference_scan,3,3);
-    // reference_gmm = k_means_constructor(reference_scan,4);
-    // reference_gmm = em_constructor(reference_scan,4);
-    reference_gmm = bayesian_gmm_constructor(reference_scan, 10);
-    reference_gmm->balance_covariances(0.05);
-    reference_gmm->plot_components_density(0, reference_scan, true);
+    // ICP registration
+    Eigen::Matrix4f final_transformation = computeICPTransformation(cloud1, cloud2);
 
-    // Generate a GMM out of the current scan
-    shared_ptr<GaussianMixturesModel<2>> current_gmm;
-    // current_gmm = ndt_constructor(current_scan,3,3);
-    // current_gmm = k_means_constructor(current_scan,4);
-    // current_gmm = em_constructor(current_scan,4);
-    current_gmm = bayesian_gmm_constructor(current_scan, 10);
-    current_gmm->balance_covariances(0.05);
-    current_gmm->plot_components_density(1, current_scan, true);
+    // Output result
+    cout << "Final Transformation:" << endl;
+    cout << final_transformation << endl;
 
-    // Set both GMM to a D2D method
-    shared_ptr<DistributionToDistribution2D> method(new DistributionToDistribution2D(reference_gmm, current_gmm));
-    // method->set_cpu_threads(6);
-
-    // Set the method to the solver with default parameters
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-
-    // Solve the registration problem starting with a zero seed
-    solver->compute_optimum();
-    solver->plot_process(0, true, 0.01);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-    std::cout << t_opt << std::endl;
-    reference_gmm.reset();
-    current_gmm.reset();
-    method.reset();
-    solver.reset();
+    return 0;
 }

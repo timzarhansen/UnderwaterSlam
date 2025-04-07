@@ -5,11 +5,18 @@
 
 #include "scanRegistrationClass.h"
 
+#include <gtsam/inference/Symbol.h>
+
+
+
 Eigen::Matrix4d
 scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
                                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
                                                   pcl::PointCloud<pcl::PointXYZ> &Final,
                                                   double &fitnessScore, Eigen::Matrix4d &initialGuessTransformation) {
+
+    Eigen::Matrix4d tmpMatrix = Eigen::Matrix4d::Identity();
+
 
     std::lock_guard<std::mutex> guard(*this->icpMutex);
 
@@ -18,70 +25,165 @@ scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ>
         guess(3,3) = -1;
         return guess;
     }
+    // pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
     pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> gicp;
-
     // change here again the direction because we want to have the transformation from 1 to 2 and not from 2 to 1(which is the registration)
     gicp.setInputSource(cloudSecondScan.makeShared());
     gicp.setInputTarget(cloudFirstScan.makeShared());
 //    gicp.setSourceCovariances(source_covariances);
 //    gicp.setTargetCovariances(target_covariances);
-    gicp.setMaxCorrespondenceDistance(1.0);
+    gicp.setMaxCorrespondenceDistance(0.5);
+    // gicp.setMaxCorrespondenceDistance (0.5);
+    // Set the maximum number of iterations (criterion 1)
+    gicp.setMaximumIterations (20);
+    // Set the transformation epsilon (criterion 2)
+    gicp.setTransformationEpsilon (1e-8);
+    // Set the euclidean distance difference epsilon (criterion 3)
+    gicp.setEuclideanFitnessEpsilon (1);
 //    gicp.setRANSACOutlierRejectionThreshold(15);
 //    gicp.setMaximumIterations(0);
 //    gicp.setMaximumOptimizerIterations(100);
 //    gicp.setMaximumIterations(100);
 //    gicp.setRANSACIterations(100);
+    //for the same settings as FS3D
+    // initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*initialGuessTransformation;
+    tmpMatrix= initialGuessTransformation.inverse();
+    initialGuessTransformation = tmpMatrix;
 
     gicp.align(Final, initialGuessTransformation.cast<float>());
+    std::cout << "alignment done" << std::endl;
+    std::cout << "has converged:" << gicp.hasConverged() << std::endl;
     //std::cout << "has converged:" << gicp.hasConverged() << " score: " <<
     //          gicp.getFitnessScore() << std::endl;
     fitnessScore = gicp.getFitnessScore();
-    return gicp.getFinalTransformation().cast<double>();
-}
+    Eigen::Matrix4d finalReturnMatrix = gicp.getFinalTransformation().cast<double>();
+    std::cout << "finalReturnMatrix:" <<  std::endl;
+    std::cout << finalReturnMatrix <<  std::endl;
+    // finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    // finalReturnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*finalReturnMatrix;
+    tmpMatrix = finalReturnMatrix.inverse();
+    finalReturnMatrix = tmpMatrix;
+    std::cout << "finalReturnMatrix After:" <<  std::endl;
+    std::cout << finalReturnMatrix <<  std::endl;
 
-//Eigen::Matrix4d
-//scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                        pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                        double &fitnessScore) {
-//    Eigen::Matrix4d guess;
-//    guess << 1, 0, 0, 0,
-//            0, 1, 0, 0,
-//            0, 0, 1, 0,
-//            0, 0, 0, 1;
-//    pcl::PointCloud<pcl::PointXYZ> Final;
-//    return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
-//                                                             fitnessScore, guess);
-//}
+    return finalReturnMatrix;
+}
 
 Eigen::Matrix4d
 scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
                                                         pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                        double &fitnessScore, Eigen::Matrix4d &guess) {
-
+                                                        double &fitnessScore) {
+    Eigen::Matrix4d guess;
+    guess << 1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1;
     pcl::PointCloud<pcl::PointXYZ> Final;
     return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
                                                              fitnessScore, guess);
 }
 
+Eigen::Matrix4d
+scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                        pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+                                                        double &fitnessScore, Eigen::Matrix4d &guess) {
+    pcl::PointCloud<pcl::PointXYZ> Final;
+    return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
+                                                             fitnessScore, guess);
+}
 
-//Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-//                                                       pcl::PointCloud<pcl::PointXYZ> &Final) {
-//    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-//    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL1 = cloudFirstScan.makeShared();
-//    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL2 = cloudSecondScan.makeShared();
-//
-//    icp.setInputSource(tmpPCL1);
-//    icp.setInputTarget(tmpPCL2);
-//
-//    icp.align(Final);
-//    std::cout << "has converged:" << icp.hasConverged() << " score: " <<
-//              icp.getFitnessScore() << std::endl;
-//    std::cout << icp.getFinalTransformation() << std::endl;
-//
-//
-//    return icp.getFinalTransformation().cast<double>();
-//}
+Eigen::Matrix4d
+scanRegistrationClass::predatorRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan) {
+
+
+    auto request = std::make_shared<commonbluerovmsg::srv::RequestOnePotentialSolution3D::Request>();
+    sensor_msgs::msg::PointCloud2 cloud1,cloud2;
+    pcl::toROSMsg(cloudFirstScan,cloud1);
+    request->pcl_scan_1 = cloud1;
+    pcl::toROSMsg(cloudSecondScan,cloud2);
+    request->pcl_scan_2 = cloud2;
+
+
+
+    auto future2 = this->predatorClient->async_send_request(request);
+    // std::cout<<"Send request. "<<std::endl;
+    Eigen::Matrix4d resultingTransformation;
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+        // std::cout<<"result is here now. "<<std::endl;
+        // Wait for the result.
+        try {
+            auto response = future2.get();
+            geometry_msgs::msg::Pose ourResult = response->resulting_transformation;
+            // convert our result to resultingTransformation
+            Eigen::Quaterniond rotation(ourResult.orientation.w,
+                                                ourResult.orientation.x,
+                                                ourResult.orientation.y,
+                                                ourResult.orientation.z);
+
+            resultingTransformation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
+            resultingTransformation.block<3, 1>(0, 3) = Eigen::Vector3d(
+                ourResult.position.x,
+                ourResult.position.y,
+                ourResult.position.z);
+
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Service call failed.");
+        }
+    }
+    // this->predatorRegistration();
+    return resultingTransformation;
+}
+
+
+Eigen::Matrix4d scanRegistrationClass::icpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+                                                       pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,double &fitnessScore,Eigen::Matrix4d initialGuessTransformation) {
+    pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL1 = cloudFirstScan.makeShared();
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPCL2 = cloudSecondScan.makeShared();
+    Eigen::Matrix4d tmpMatrix = Eigen::Matrix4d::Identity();
+
+    // std::vector<int> indices;
+    // pcl::removeNaNFromPointCloud(*tmpPCL1, *tmpPCL1, indices);
+    // pcl::removeNaNFromPointCloud(*tmpPCL2, *tmpPCL2, indices);
+
+    icp.setInputSource(tmpPCL1);
+    icp.setInputTarget(tmpPCL2);
+    // Set the max correspondence distance to 5cm (e.g., correspondences with higher
+    // distances will be ignored)
+    icp.setMaxCorrespondenceDistance (0.5);
+    // Set the maximum number of iterations (criterion 1)
+    icp.setMaximumIterations (50);
+    // Set the transformation epsilon (criterion 2)
+    icp.setTransformationEpsilon (1e-8);
+    // Set the euclidean distance difference epsilon (criterion 3)
+    icp.setEuclideanFitnessEpsilon (1);
+    // initialGuessTransformation(0,3) =-initialGuessTransformation(0,3);
+    // initialGuessTransformation = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*initialGuessTransformation;
+    tmpMatrix = initialGuessTransformation.inverse();
+    initialGuessTransformation = tmpMatrix;
+
+    // std::cout << "initialGuessTransformation:" << std::endl;
+    // std::cout << initialGuessTransformation << std::endl;
+    // Eigen::Matrix4d initialGuessTransformation = Eigen::Matrix4d::Identity();
+    pcl::PointCloud<pcl::PointXYZ> Final;
+    icp.align(Final,initialGuessTransformation.cast<float>());
+    // std::cout << "alignment done" << std::endl;
+    // std::cout << "has converged:" << icp.hasConverged() << std::endl;
+    // std::cout << " score: " << icp.getFitnessScore() << std::endl;
+    // std::cout << icp.getFinalTransformation() << std::endl;
+
+    fitnessScore = 1;
+    Eigen::Matrix4d finalReturnMatrix = icp.getFinalTransformation().cast<double>();
+    // finalReturnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,M_PI)*finalReturnMatrix;
+    // finalReturnMatrix = finalReturnMatrix.inverse();
+    tmpMatrix = finalReturnMatrix.inverse();
+    finalReturnMatrix = tmpMatrix;
+    // finalReturnMatrix(0,3) =-finalReturnMatrix(0,3);
+    return finalReturnMatrix;
+}
 
 
 //Eigen::Matrix4d scanRegistrationClass::sofftRegistration2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
@@ -288,75 +390,75 @@ scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::Poi
 //    return transformationsList[distanceToMaxElement].inverse();
 //}
 
-
-Eigen::Matrix4d scanRegistrationClass::ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                  pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                  Eigen::Matrix4d initialGuess,
-                                                  bool useInitialGuess) {
-    std::lock_guard<std::mutex> guard(*this->ndtd2dMutex);
-    Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
-    pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
-    pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
-//    initialGuess(0, 1) = -initialGuess(0, 1);
-//    initialGuess(1, 0) = -initialGuess(1, 0);
-//    initialGuess(1, 3) = -initialGuess(1, 3);
-
-
-    double __res[] = {0.5, 1, 2, 4};
-    std::vector<double> resolutions(__res, __res + sizeof(__res) / sizeof(double));
-
-
-    Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
-//    Tout.setIdentity();
-
-
-//    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
-
-    lslgeneric::NDTMatcherD2D_2D<pcl::PointXYZ, pcl::PointXYZ> matcherD2D(false, false, resolutions);
-
-    bool ret = matcherD2D.match(cloudFirstScan, cloudSecondScan, Tout, useInitialGuess);
-
-//    Tout(0, 1) = -Tout(0, 1);
-//    Tout(1, 0) = -Tout(1, 0);
-//    Tout(1, 3) = -Tout(1, 3);
-
-//    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
-    return Tout.matrix();
-}
-
-Eigen::Matrix4d scanRegistrationClass::ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                               pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                               Eigen::Matrix4d initialGuess,
-                                               bool useInitialGuess) {
-    std::lock_guard<std::mutex> guard(*this->ndtp2dMutex);
-    Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
-    pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
-    pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
-
-//    initialGuess(0, 1) = -initialGuess(0, 1);
-//    initialGuess(1, 0) = -initialGuess(1, 0);
-//    initialGuess(1, 3) = -initialGuess(1, 3);
 //
-//    printf("X %f Y %f Z %f Roll %f Pitch %f Yaw %f \n",xoffset,yoffset,zoffset,roll,pitch,yaw);
+// Eigen::Matrix4d scanRegistrationClass::ndt_d2d_2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                   Eigen::Matrix4d initialGuess,
+//                                                   bool useInitialGuess) {
+//     std::lock_guard<std::mutex> guard(*this->ndtd2dMutex);
+//     Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
+//     pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
+//     pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
+// //    initialGuess(0, 1) = -initialGuess(0, 1);
+// //    initialGuess(1, 0) = -initialGuess(1, 0);
+// //    initialGuess(1, 3) = -initialGuess(1, 3);
+//
+//
+//     double __res[] = {0.5, 1, 2, 4};
+//     std::vector<double> resolutions(__res, __res + sizeof(__res) / sizeof(double));
+//
+//
+//     Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
+// //    Tout.setIdentity();
+//
+//
+// //    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
+//
+//     lslgeneric::NDTMatcherD2D_2D<pcl::PointXYZ, pcl::PointXYZ> matcherD2D(false, false, resolutions);
+//
+//     bool ret = matcherD2D.match(cloudFirstScan, cloudSecondScan, Tout, useInitialGuess);
+//
+// //    Tout(0, 1) = -Tout(0, 1);
+// //    Tout(1, 0) = -Tout(1, 0);
+// //    Tout(1, 3) = -Tout(1, 3);
+//
+// //    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
+//     return Tout.matrix();
+// }
 
-
-    Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
-
-//    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
-
-    lslgeneric::NDTMatcherP2D<pcl::PointXYZ, pcl::PointXYZ> matcherP2D;
-
-    bool ret = matcherP2D.match(cloudFirstScan, cloudSecondScan, Tout);
-
-//    Tout(0, 1) = Tout(0, 1);
-//    Tout(1, 0) = Tout(1, 0);
-//    Tout(1, 3) = Tout(1, 3);
-
-//    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
-
-
-    return Tout.matrix();
-}
+// Eigen::Matrix4d scanRegistrationClass::ndt_p2d(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                Eigen::Matrix4d initialGuess,
+//                                                bool useInitialGuess) {
+//     std::lock_guard<std::mutex> guard(*this->ndtp2dMutex);
+//     Eigen::Matrix4d transformationX180Degree = generalHelpfulTools::getTransformationMatrixFromRPY(0.00001, 0, 0);
+//     pcl::transformPointCloud(cloudFirstScan, cloudFirstScan, transformationX180Degree);
+//     pcl::transformPointCloud(cloudSecondScan, cloudSecondScan, transformationX180Degree);
+//
+// //    initialGuess(0, 1) = -initialGuess(0, 1);
+// //    initialGuess(1, 0) = -initialGuess(1, 0);
+// //    initialGuess(1, 3) = -initialGuess(1, 3);
+// //
+// //    printf("X %f Y %f Z %f Roll %f Pitch %f Yaw %f \n",xoffset,yoffset,zoffset,roll,pitch,yaw);
+//
+//
+//     Eigen::Transform<double, 3, Eigen::Affine, Eigen::ColMajor> Tout(initialGuess);
+//
+// //    std::cout<<"Transform Before: \n"<<Tout.matrix()<<std::endl;
+//
+//     // lslgeneric::NDTMatcherP2D<pcl::PointXYZ, pcl::PointXYZ> matcherP2D;
+//
+//     bool ret = matcherP2D.match(cloudFirstScan, cloudSecondScan, Tout);
+//
+// //    Tout(0, 1) = Tout(0, 1);
+// //    Tout(1, 0) = Tout(1, 0);
+// //    Tout(1, 3) = Tout(1, 3);
+//
+// //    std::cout<<"Transform: \n"<<Tout.matrix()<<std::endl;
+//
+//
+//     return Tout.matrix();
+// }
 
 
 //Eigen::Vector2d scanRegistrationClass::sofftRegistrationVoxel2DTranslation(double voxelData1Input[],
@@ -391,7 +493,7 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
 //    int k = cv::waitKey(0); // Wait for a keystroke in the window
 
 
-    auto request = std::make_shared<fs2d::srv::RequestOnePotentialSolution::Request>();
+    auto request = std::make_shared<fsregistration::srv::RequestOnePotentialSolution2D::Request>();
     double overallMax = std::max(maximumVoxel1,maximumVoxel2);
 //    fs2d::srv::RequestOnePotentialSolution::Request request;
     for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData ; i++){
@@ -431,7 +533,7 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
 
 
 
-    auto future2 = this->onePotentialClient->async_send_request(request);
+    auto future2 = this->onePotentialClient2D->async_send_request(request);
     Eigen::Matrix4d resultingTransformation;
     if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
         rclcpp::FutureReturnCode::SUCCESS) {
@@ -474,8 +576,8 @@ Eigen::Matrix4d scanRegistrationClass::registrationOfTwoVoxelsSOFFTFast(double v
     return resultingTransformation;
 }
 
-std::vector<fs2d::msg::PotentialSolution>
-scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],double maximumVoxel1,
+std::vector<fsregistration::msg::PotentialSolution2D>
+scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
                                                                  double voxelData2Input[],double maximumVoxel2,
                                                                  Eigen::Matrix4d initialGuess,
                                                                  Eigen::Matrix3d &covarianceMatrix,
@@ -484,7 +586,7 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
 
 
 
-    auto request = std::make_shared<fs2d::srv::RequestListPotentialSolution::Request>();
+    auto request = std::make_shared<fsregistration::srv::RequestListPotentialSolution2D::Request>();
     double overallMax = std::max(maximumVoxel1,maximumVoxel2);
 //    fs2d::srv::RequestOnePotentialSolution::Request request;
     for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData ; i++){
@@ -521,9 +623,9 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
     request->potential_for_necessary_peak = 0.1;
     request->size_image = this->sizeVoxelData;
 
-    std::vector<fs2d::msg::PotentialSolution> ourListOfResults;
+    std::vector<fsregistration::msg::PotentialSolution2D> ourListOfResults;
 
-    auto future2 = this->listPotentialClient->async_send_request(request);
+    auto future2 = this->listPotentialClient2D->async_send_request(request);
     Eigen::Matrix4d resultingTransformation;
     if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
         rclcpp::FutureReturnCode::SUCCESS) {
@@ -581,6 +683,187 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
 
 }
 
+std::vector<fsregistration::msg::PotentialSolution3D>
+scanRegistrationClass::registrationOfTwoVoxels3DSOFFTAllSolutions(double voxelData1Input[],double maximumVoxel1,
+                                                                 double voxelData2Input[],double maximumVoxel2,
+                                                                 Eigen::Matrix4d initialGuess,
+                                                                 Eigen::Matrix3d &covarianceMatrix,
+                                                                 double cellSize,double &timeToCalculate,double level_potential_translation) {
+
+
+
+
+    auto request = std::make_shared<fsregistration::srv::RequestListPotentialSolution3D::Request>();
+    double overallMax = std::max(maximumVoxel1,maximumVoxel2);
+//    fs2d::srv::RequestOnePotentialSolution::Request request;
+    std::cout<<"sonar Size VoxelSize: "<< this->sizeVoxelData <<std::endl;
+    std::cout<<"overallMax: "<< overallMax <<std::endl;
+    for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData*this->sizeVoxelData ; i++){
+        double resultingInput1 = voxelData1Input[i]/overallMax;
+        double resultingInput2 = voxelData2Input[i]/overallMax;
+        request->sonar_scan_1.push_back(resultingInput1);
+        request->sonar_scan_2.push_back(resultingInput2);
+    }
+
+// maybe save sonar result here to a file.
+    // std::ofstream voxel1,voxel2;
+    // voxel1.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel1.csv");
+    // voxel2.open("/home/tim-external/dataFolder/pointclouds/testPCLs/voxel2.csv");
+    // //save errors angle
+    // for (int i = 0; i < this->sizeVoxelData*this->sizeVoxelData*this->sizeVoxelData; i++) {
+    //     voxel1 << request->sonar_scan_1[i];//time
+    //     voxel1 << "\n";//error
+    //     voxel2 << request->sonar_scan_2[i];//time
+    //     voxel2 << "\n";//error
+    // }
+    // voxel1.close();
+    // voxel2.close();
+
+
+
+    geometry_msgs::msg::Pose poseMsg;
+
+    Eigen::Quaterniond quaternionInitGuess;
+    Eigen::Vector3d translationInitGuess;
+    generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(translationInitGuess, quaternionInitGuess,
+                                                                 initialGuess);
+
+    poseMsg.position.x = translationInitGuess.x();
+    poseMsg.position.y = translationInitGuess.y();
+    poseMsg.position.z = translationInitGuess.z();
+
+    poseMsg.orientation.x = quaternionInitGuess.x();
+    poseMsg.orientation.y = quaternionInitGuess.y();
+    poseMsg.orientation.z = quaternionInitGuess.z();
+    poseMsg.orientation.w = quaternionInitGuess.w();
+
+
+    request->size_of_voxel = cellSize;
+    request->level_potential_rotation = 0.01;
+    request->level_potential_translation = level_potential_translation;
+    request->r_min = this->sizeVoxelData/8;
+    request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
+    request->dimension_size = this->sizeVoxelData;
+     request->debug = false;
+     request->timing_computation_duration = false;
+     request->use_clahe = true;
+     request->set_normalization = 1;
+     request->set_r_manual = true;
+
+
+    // std::cout<<"request done, now we want to send it  "<<std::endl;
+    std::vector<fsregistration::msg::PotentialSolution3D> ourListOfResults;
+
+    auto future2 = this->listPotentialClient3D->async_send_request(request);
+    // std::cout<<"Send request. "<<std::endl;
+    Eigen::Matrix4d resultingTransformation;
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+        // std::cout<<"result is here now. "<<std::endl;
+        // Wait for the result.
+        try {
+            auto response = future2.get();
+            std::cout<<"print number Of Solutions " << response->list_potential_solutions.size()<<std::endl;
+
+            timeToCalculate =response->list_potential_solutions[0].time_to_calculate;
+
+            for(int i = 0 ; i<response->list_potential_solutions.size();i++){
+
+
+                ourListOfResults.push_back(response->list_potential_solutions[i]);
+            }
+
+//            std::cout << resultingTransformation << std::endl;
+
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Service call failed.");
+        }
+    }
+
+
+    std::cout<<"returning result Transformations"<<std::endl;
+    return ourListOfResults;
+}
+
+fsregistration::msg::PotentialSolution3D
+scanRegistrationClass::registrationOfTwoVoxels3DSOFFTOneSolution(double voxelData1Input[],double maximumVoxel1,
+                                                                 double voxelData2Input[],double maximumVoxel2,
+                                                                 Eigen::Matrix4d initialGuess,
+                                                                 Eigen::Matrix3d &covarianceMatrix,
+                                                                 double cellSize,double &timeToCalculate,double level_potential_translation) {
+
+
+
+
+    auto request = std::make_shared<fsregistration::srv::RequestOnePotentialSolution3D::Request>();
+    double overallMax = std::max(maximumVoxel1,maximumVoxel2);
+//    fs2d::srv::RequestOnePotentialSolution::Request request;
+    std::cout<<"sonar Size VoxelSize: "<< this->sizeVoxelData <<std::endl;
+    std::cout<<"overallMax: "<< overallMax <<std::endl;
+    for(int i = 0 ; i< this->sizeVoxelData*this->sizeVoxelData*this->sizeVoxelData ; i++){
+        double resultingInput1 = voxelData1Input[i]/overallMax;
+        double resultingInput2 = voxelData2Input[i]/overallMax;
+        request->sonar_scan_1.push_back(resultingInput1);
+        request->sonar_scan_2.push_back(resultingInput2);
+    }
+
+
+
+    geometry_msgs::msg::Pose poseMsg;
+
+    Eigen::Quaterniond quaternionInitGuess;
+    Eigen::Vector3d translationInitGuess;
+    generalHelpfulTools::splitTransformationMatrixToQuadAndTrans(translationInitGuess, quaternionInitGuess,
+                                                                 initialGuess);
+
+    poseMsg.position.x = translationInitGuess.x();
+    poseMsg.position.y = translationInitGuess.y();
+    poseMsg.position.z = translationInitGuess.z();
+
+    poseMsg.orientation.x = quaternionInitGuess.x();
+    poseMsg.orientation.y = quaternionInitGuess.y();
+    poseMsg.orientation.z = quaternionInitGuess.z();
+    poseMsg.orientation.w = quaternionInitGuess.w();
+
+
+    request->size_of_voxel = cellSize;
+    request->level_potential_rotation = 0.01;
+    request->level_potential_translation = level_potential_translation;
+    request->r_min = this->sizeVoxelData/8;
+    request->r_max = this->sizeVoxelData / 2 - this->sizeVoxelData / 8;
+    request->dimension_size = this->sizeVoxelData;
+     request->debug = false;
+     request->timing_computation_duration = false;
+     request->use_clahe = true;
+     request->set_normalization = 1;
+     request->set_r_manual = true;
+
+
+    // std::cout<<"request done, now we want to send it  "<<std::endl;
+    fsregistration::msg::PotentialSolution3D ourResult;
+
+    auto future2 = this->onePotentialClient3D->async_send_request(request);
+    // std::cout<<"Send request. "<<std::endl;
+    Eigen::Matrix4d resultingTransformation;
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+        // std::cout<<"result is here now. "<<std::endl;
+        // Wait for the result.
+        try {
+            auto response = future2.get();
+            ourResult = response->potential_solution;
+
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Service call failed.");
+        }
+    }
+
+
+    // std::cout<<"returning result Transformations"<<std::endl;
+    return ourResult;
+}
 
 //Eigen::Matrix4d
 //scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelData1Input[],
@@ -635,345 +918,345 @@ scanRegistrationClass::registrationOfTwoVoxelsSOFFTAllSoluations(double voxelDat
 
 
 
-Eigen::Matrix4d scanRegistrationClass::registrationFourerMellin(double voxelData1Input[],
-                                                                double voxelData2Input[],
-                                                                double cellSize,
-                                                                bool debug) {
-    std::lock_guard<std::mutex> guard(*this->fourierMellinMutex);
-    cv::Mat convertedMat1;
-    cv::Mat convertedMat2;
-
-
-    cv::Mat magTMP1(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData1Input);
-    cv::Mat magTMP2(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData2Input);
-    magTMP1.convertTo(convertedMat1, CV_8U);
-    magTMP2.convertTo(convertedMat2, CV_8U);
-
-    cv::cvtColor(convertedMat1, convertedMat1, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(convertedMat2, convertedMat2, cv::COLOR_GRAY2BGR);
-
-
-
-
-    fourierMellinRegistration image_registration(convertedMat1);
-
-    // x, y, rotation, scale
-    std::vector<double> transform_params(4, 0.0);
-    cv::Mat registered_image;
-    image_registration.registerImage(convertedMat2, registered_image, transform_params, debug);
-
-    Eigen::Matrix4d resultTransformation = Eigen::Matrix4d::Identity();
-    Eigen::AngleAxisd rotation_vector2(transform_params[2] / 180.0 * 3.14159, Eigen::Vector3d(0, 0, 1));
-    Eigen::Matrix3d tmpMatrix3d = rotation_vector2.toRotationMatrix();
-    resultTransformation.block<3, 3>(0, 0) = tmpMatrix3d;
-
-    resultTransformation(0, 3) = transform_params[1] * cellSize;
-    resultTransformation(1, 3) = transform_params[0] * cellSize;
-    resultTransformation(2, 3) = 0;
-    if (debug) {
-        cv::imshow("im0_rotated", convertedMat1);
-        cv::imshow("im1_rotated", convertedMat2);
-        cv::waitKey(0);
-    }
-
-    return resultTransformation;
-}
-
-Eigen::Matrix4d scanRegistrationClass::registrationFeatureBased(double voxelData1Input[],
-                                                                double voxelData2Input[],
-                                                                double cellSize,int methodType,
-                                                                bool debug) {
-    std::lock_guard<std::mutex> guard(*this->featureBasedMutex);
-
-    cv::Mat magTMP1(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData1Input);
-    cv::Mat magTMP2(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData2Input);
-
-    cv::Mat convertedMat1;
-    cv::Mat convertedMat2;
-
-    magTMP1.convertTo(convertedMat1, CV_8U);
-    magTMP2.convertTo(convertedMat2, CV_8U);
-
-    cv::cvtColor(convertedMat1,convertedMat1,cv::COLOR_GRAY2BGR);
-    cv::cvtColor(convertedMat2,convertedMat2,cv::COLOR_GRAY2BGR);
-    cv::Ptr<cv::Feature2D> D;
-    cv::BFMatcher M;
-    //    D = cv::KAZE::create();
-    switch(methodType){
-        case 0:
-
-            D = cv::AKAZE::create();
-            M = cv::BFMatcher(cv::NORM_HAMMING);
-            break;
-        case 1:
-            D = cv::KAZE::create();
-            M = cv::BFMatcher(cv::NORM_L2);
-            break;
-        case 2:
-            D = cv::ORB::create();
-            M = cv::BFMatcher(cv::NORM_HAMMING);
-            break;
-        case 3:
-            D = cv::BRISK::create();
-            M = cv::BFMatcher(cv::NORM_HAMMING);
-            break;
-        case 4:
-//            std::cout << "testingIfItComesUp" << std::endl;
-//            printf("OpenCV: %s", cv::getBuildInformation().c_str());
-            D = cv::xfeatures2d::SURF::create();
-            M = cv::BFMatcher(cv::NORM_L2);
-//            std::cout << "afterwards" << std::endl;
-            break;
-        case 5:
-            D = cv::SIFT::create();
-            M = cv::BFMatcher(cv::NORM_L2);
-            break;
-    }
-
-
-    std::vector<cv::KeyPoint> kpts1, kpts2, matched1, matched2;
-    cv::Mat desc1, desc2;
-
-    D->detectAndCompute(convertedMat1, cv::noArray(), kpts1, desc1);
-    D->detectAndCompute(convertedMat2, cv::noArray(), kpts2, desc2);
-    if(kpts1.empty() || kpts2.empty()){
-        Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-    }
-
-    cv::Mat J; //to save temporal images
-
-    if(debug)
-    {
-        drawKeypoints(convertedMat1, kpts1, J);
-        imshow("Keypoints 1", J);
-//    imwrite("Keypoints1.jpg", J);
-        drawKeypoints(convertedMat2, kpts2, J);
-        imshow("Keypoints 2", J);
-//    imwrite("Keypoints2.jpg", J);
-        cv::waitKey(0);
-    }
-
-
-
-
-    std::vector< std::vector<cv::DMatch> > knn_matches;
-    std::vector<cv::DMatch> good_matches;
-    M.knnMatch(desc2, desc1, knn_matches, 2);
-    const float nn_match_ratio = 0.9f;   // Nearest neighbor matching ratio
-
-
-    //Use 2-nn matches to find correct keypoint matches
-    for(size_t i = 0; i < knn_matches.size(); i++) {
-        cv::DMatch nearest = knn_matches[i][0];
-        double dist1 = knn_matches[i][0].distance;
-        double dist2 = knn_matches[i][1].distance;
-        if(dist1 < dist2*nn_match_ratio) {
-            int new_i = static_cast<int>(matched1.size());
-            matched1.push_back(kpts1[nearest.trainIdx]);
-            matched2.push_back(kpts2[nearest.queryIdx]);
-            good_matches.push_back(cv::DMatch(new_i, new_i, 0));
-        }
-    }
-    if(debug){
-        drawMatches(convertedMat1, matched1, convertedMat2, matched2, good_matches, J);
-        imshow("Matches", J);
-        cv::waitKey(0);
-    }
-
-
-//Use matches to compute the homography matrix
-    std::vector<cv::Point2f> first;
-    std::vector<cv::Point2f> second;
-
-    for( int i = 0; i < good_matches.size(); i++ )
-    {
-        first.push_back( matched1[i].pt);
-        second.push_back( matched2[i].pt);
-    }
-//    cv::Mat H = findHomography(second, first, cv::RANSAC, 5.0);
-    if(second.empty() || first.empty()){
-        Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-    }
-
-    cv::Mat HNew = cv::estimateAffine2D(second, first);
-    if(HNew.empty()){
-        Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-    }
-    cv::Mat H = cv::Mat::eye(3,3,CV_64F);
-    Eigen::Matrix3d testResultMatrix = Eigen::Matrix3d::Identity();
-    for(int i = 0; i < 2; i++){
-        for(int j = 0; j < 3; j++){
-            H.at<double>(i,j) = HNew.at<double>(i,j);
-            testResultMatrix(i,j) = H.at<double>(i,j);
-        }
-    }
-    Eigen::Matrix3d onlyRotationMatrix = Eigen::Matrix3d::Identity();
-    Eigen::Matrix3d negativeTranslation = Eigen::Matrix3d::Identity();
-    Eigen::Matrix3d positiveTranslation = Eigen::Matrix3d::Identity();
-
-    onlyRotationMatrix.block<2,2>(0,0) = testResultMatrix.block<2,2>(0,0);
-    negativeTranslation(0,2) =-this->sizeVoxelData/2.0;//-testResultMatrix(0,2);
-    negativeTranslation(1,2) =-this->sizeVoxelData/2.0;//-testResultMatrix(1,2);
-    positiveTranslation(0,2) =this->sizeVoxelData/2.0;//testResultMatrix(0,2);
-    positiveTranslation(1,2) =this->sizeVoxelData/2.0;//testResultMatrix(1,2);
-
-
-    Eigen::Matrix3d testHowGood = negativeTranslation*testResultMatrix*positiveTranslation;
-    double x = testHowGood(0,2);
-    double y = testHowGood(1,2);
-    testHowGood(0,2) = -y*cellSize;
-    testHowGood(1,2) = -x*cellSize;
-    Eigen::Matrix4d returnMatrix = Eigen::Matrix4d::Identity();
-
-    returnMatrix(0,3) = testHowGood(0,2);
-    returnMatrix(1,3) = testHowGood(1,2);
-    returnMatrix.block<2,2>(0,0) = testHowGood.block<2,2>(0,0);
-
-
-
-    if(debug){
-        cv::cvtColor(convertedMat1,convertedMat1,cv::COLOR_BGR2GRAY);
-        cv::cvtColor(convertedMat2,convertedMat2,cv::COLOR_BGR2GRAY);
-
-        //Apply the computed homography matrix to warp the second image
-        cv::Mat Panorama(convertedMat1.rows, 2 * convertedMat1.cols,  CV_8U);
-        warpPerspective(convertedMat2, Panorama, H, Panorama.size());
-
-
-        Panorama.convertTo(Panorama,CV_64F,1.0/255.0);
-        convertedMat1.convertTo(convertedMat1,CV_64F,1.0/255.0);
-        convertedMat2.convertTo(convertedMat2,CV_64F,1.0/255.0);
-
-        for(int i = 0; i < convertedMat1.rows; i++){
-            for(int j = 0; j < convertedMat1.cols; j++){
-                Panorama.at<double>(i,j) = (Panorama.at<double>(i,j)+convertedMat1.at<double>(i,j))/2.0;
-            }
-        }
-        imshow("Panorama1", Panorama);
-        for(int i = 0; i < convertedMat1.rows; i++){
-            for(int j = 0; j < convertedMat1.cols; j++){
-                Panorama.at<double>(i,j) = (convertedMat1.at<double>(i,j)+convertedMat2.at<double>(i,j))/2.0;
-            }
-        }
-        cv::waitKey(0);
-    }
-
-
-
-    return returnMatrix;
-}
-
-
-
-
-Eigen::Matrix4d scanRegistrationClass::gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                   Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
-    std::lock_guard<std::mutex> guard(*this->gmmd2dMutex);
-
-    //Convert scan to 2D vector xy points.
-    std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
-    std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
-    for(int i = 0 ; i <cloudFirstScan.points.size();i++){
-        currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    for(int i = 0 ; i <cloudSecondScan.points.size();i++){
-        referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-    // reference scan
-    shared_ptr<GaussianMixturesModel<2>> reference_gmm;
-
-    reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
-    reference_gmm->balance_covariances(0.05);
-//    reference_gmm->plot_components_density(0, referenceScanVector, false);
-
-    // current Scan
-    shared_ptr<GaussianMixturesModel<2>> current_gmm;
-    current_gmm = bayesian_gmm_constructor(currentScanVector, 50);
-    current_gmm->balance_covariances(0.05);
-//    current_gmm->plot_components_density(1, currentScanVector, false);
-
-
-    shared_ptr<DistributionToDistribution2D> method(new DistributionToDistribution2D(reference_gmm, current_gmm));
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-    solver->compute_optimum();
-//    solver->plot_process(0, false, 0.01);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-
-//  convert t_opt to Matrix4d
-    std::cout << t_opt << std::endl;
-    Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
-    returnMatrix(0,3) = t_opt[0];
-    returnMatrix(1,3) = t_opt[1];
-
-    if(h_opt.isZero(0.0000001)){
-        returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-
-    }
-    return returnMatrix;
-
-
-}
-
-Eigen::Matrix4d scanRegistrationClass::gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
-                                                          pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
-                                                          Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
-    std::lock_guard<std::mutex> guard(*this->gmmp2dMutex);
-
-    //Convert scan to 2D vector xy points.
-    std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
-    std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
-    for(int i = 0 ; i <cloudFirstScan.points.size();i++){
-        currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    for(int i = 0 ; i <cloudSecondScan.points.size();i++){
-        referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
-    }
-
-    // reference scan
-    shared_ptr<GaussianMixturesModel<2>> reference_gmm;
-
-    reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
-    reference_gmm->balance_covariances(0.05);
-//    reference_gmm->plot_components_density(0, referenceScanVector, false);
-//    std::cout << "test3:" <<reference_gmm->k() << std::endl;
-
-    // current Scan
-//    shared_ptr<GaussianMixturesModel<2>> current_gmm;
-//    current_gmm = bayesian_gmm_constructor(currentScanVector, 10);
-//    current_gmm->balance_covariances(0.05);
-//    current_gmm->plot_components_density(1, currentScanVector, true);
-
-
-    shared_ptr<PointsToDistribution2D> method(
-            new PointsToDistribution2D(reference_gmm, std::make_shared<std::vector<Eigen::Vector2d>>(currentScanVector)));
-
-    unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
-    solver->compute_optimum();
-//    solver->plot_process(0, false, 0.01);
-    Eigen::Vector3d t_opt = solver->get_optimal();
-    Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
-
-//  convert t_opt to Matrix4d
-    Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
-    returnMatrix(0,3) = t_opt[0];
-    returnMatrix(1,3) = t_opt[1];
-
-    if(h_opt.isZero(0.0000001) ){
-        returnMatrix =  Eigen::Matrix4d::Identity();
-        returnMatrix(3,3) = -1;
-        return returnMatrix;
-    }
-    return returnMatrix;
-}
+// Eigen::Matrix4d scanRegistrationClass::registrationFourerMellin(double voxelData1Input[],
+//                                                                 double voxelData2Input[],
+//                                                                 double cellSize,
+//                                                                 bool debug) {
+//     std::lock_guard<std::mutex> guard(*this->fourierMellinMutex);
+//     cv::Mat convertedMat1;
+//     cv::Mat convertedMat2;
+//
+//
+//     cv::Mat magTMP1(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData1Input);
+//     cv::Mat magTMP2(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData2Input);
+//     magTMP1.convertTo(convertedMat1, CV_8U);
+//     magTMP2.convertTo(convertedMat2, CV_8U);
+//
+//     cv::cvtColor(convertedMat1, convertedMat1, cv::COLOR_GRAY2BGR);
+//     cv::cvtColor(convertedMat2, convertedMat2, cv::COLOR_GRAY2BGR);
+//
+//
+//
+//
+//     fourierMellinRegistration image_registration(convertedMat1);
+//
+//     // x, y, rotation, scale
+//     std::vector<double> transform_params(4, 0.0);
+//     cv::Mat registered_image;
+//     image_registration.registerImage(convertedMat2, registered_image, transform_params, debug);
+//
+//     Eigen::Matrix4d resultTransformation = Eigen::Matrix4d::Identity();
+//     Eigen::AngleAxisd rotation_vector2(transform_params[2] / 180.0 * 3.14159, Eigen::Vector3d(0, 0, 1));
+//     Eigen::Matrix3d tmpMatrix3d = rotation_vector2.toRotationMatrix();
+//     resultTransformation.block<3, 3>(0, 0) = tmpMatrix3d;
+//
+//     resultTransformation(0, 3) = transform_params[1] * cellSize;
+//     resultTransformation(1, 3) = transform_params[0] * cellSize;
+//     resultTransformation(2, 3) = 0;
+//     if (debug) {
+//         cv::imshow("im0_rotated", convertedMat1);
+//         cv::imshow("im1_rotated", convertedMat2);
+//         cv::waitKey(0);
+//     }
+//
+//     return resultTransformation;
+// }
+//
+// Eigen::Matrix4d scanRegistrationClass::registrationFeatureBased(double voxelData1Input[],
+//                                                                 double voxelData2Input[],
+//                                                                 double cellSize,int methodType,
+//                                                                 bool debug) {
+//     std::lock_guard<std::mutex> guard(*this->featureBasedMutex);
+//
+//     cv::Mat magTMP1(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData1Input);
+//     cv::Mat magTMP2(this->sizeVoxelData, this->sizeVoxelData, CV_64F, voxelData2Input);
+//
+//     cv::Mat convertedMat1;
+//     cv::Mat convertedMat2;
+//
+//     magTMP1.convertTo(convertedMat1, CV_8U);
+//     magTMP2.convertTo(convertedMat2, CV_8U);
+//
+//     cv::cvtColor(convertedMat1,convertedMat1,cv::COLOR_GRAY2BGR);
+//     cv::cvtColor(convertedMat2,convertedMat2,cv::COLOR_GRAY2BGR);
+//     cv::Ptr<cv::Feature2D> D;
+//     cv::BFMatcher M;
+//     //    D = cv::KAZE::create();
+//     switch(methodType){
+//         case 0:
+//
+//             D = cv::AKAZE::create();
+//             M = cv::BFMatcher(cv::NORM_HAMMING);
+//             break;
+//         case 1:
+//             D = cv::KAZE::create();
+//             M = cv::BFMatcher(cv::NORM_L2);
+//             break;
+//         case 2:
+//             D = cv::ORB::create();
+//             M = cv::BFMatcher(cv::NORM_HAMMING);
+//             break;
+//         case 3:
+//             D = cv::BRISK::create();
+//             M = cv::BFMatcher(cv::NORM_HAMMING);
+//             break;
+//         case 4:
+// //            std::cout << "testingIfItComesUp" << std::endl;
+// //            printf("OpenCV: %s", cv::getBuildInformation().c_str());
+//             D = cv::xfeatures2d::SURF::create();
+//             M = cv::BFMatcher(cv::NORM_L2);
+// //            std::cout << "afterwards" << std::endl;
+//             break;
+//         case 5:
+//             D = cv::SIFT::create();
+//             M = cv::BFMatcher(cv::NORM_L2);
+//             break;
+//     }
+//
+//
+//     std::vector<cv::KeyPoint> kpts1, kpts2, matched1, matched2;
+//     cv::Mat desc1, desc2;
+//
+//     D->detectAndCompute(convertedMat1, cv::noArray(), kpts1, desc1);
+//     D->detectAndCompute(convertedMat2, cv::noArray(), kpts2, desc2);
+//     if(kpts1.empty() || kpts2.empty()){
+//         Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//     }
+//
+//     cv::Mat J; //to save temporal images
+//
+//     if(debug)
+//     {
+//         drawKeypoints(convertedMat1, kpts1, J);
+//         imshow("Keypoints 1", J);
+// //    imwrite("Keypoints1.jpg", J);
+//         drawKeypoints(convertedMat2, kpts2, J);
+//         imshow("Keypoints 2", J);
+// //    imwrite("Keypoints2.jpg", J);
+//         cv::waitKey(0);
+//     }
+//
+//
+//
+//
+//     std::vector< std::vector<cv::DMatch> > knn_matches;
+//     std::vector<cv::DMatch> good_matches;
+//     M.knnMatch(desc2, desc1, knn_matches, 2);
+//     const float nn_match_ratio = 0.9f;   // Nearest neighbor matching ratio
+//
+//
+//     //Use 2-nn matches to find correct keypoint matches
+//     for(size_t i = 0; i < knn_matches.size(); i++) {
+//         cv::DMatch nearest = knn_matches[i][0];
+//         double dist1 = knn_matches[i][0].distance;
+//         double dist2 = knn_matches[i][1].distance;
+//         if(dist1 < dist2*nn_match_ratio) {
+//             int new_i = static_cast<int>(matched1.size());
+//             matched1.push_back(kpts1[nearest.trainIdx]);
+//             matched2.push_back(kpts2[nearest.queryIdx]);
+//             good_matches.push_back(cv::DMatch(new_i, new_i, 0));
+//         }
+//     }
+//     if(debug){
+//         drawMatches(convertedMat1, matched1, convertedMat2, matched2, good_matches, J);
+//         imshow("Matches", J);
+//         cv::waitKey(0);
+//     }
+//
+//
+// //Use matches to compute the homography matrix
+//     std::vector<cv::Point2f> first;
+//     std::vector<cv::Point2f> second;
+//
+//     for( int i = 0; i < good_matches.size(); i++ )
+//     {
+//         first.push_back( matched1[i].pt);
+//         second.push_back( matched2[i].pt);
+//     }
+// //    cv::Mat H = findHomography(second, first, cv::RANSAC, 5.0);
+//     if(second.empty() || first.empty()){
+//         Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//     }
+//
+//     cv::Mat HNew = cv::estimateAffine2D(second, first);
+//     if(HNew.empty()){
+//         Eigen::Matrix4d returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//     }
+//     cv::Mat H = cv::Mat::eye(3,3,CV_64F);
+//     Eigen::Matrix3d testResultMatrix = Eigen::Matrix3d::Identity();
+//     for(int i = 0; i < 2; i++){
+//         for(int j = 0; j < 3; j++){
+//             H.at<double>(i,j) = HNew.at<double>(i,j);
+//             testResultMatrix(i,j) = H.at<double>(i,j);
+//         }
+//     }
+//     Eigen::Matrix3d onlyRotationMatrix = Eigen::Matrix3d::Identity();
+//     Eigen::Matrix3d negativeTranslation = Eigen::Matrix3d::Identity();
+//     Eigen::Matrix3d positiveTranslation = Eigen::Matrix3d::Identity();
+//
+//     onlyRotationMatrix.block<2,2>(0,0) = testResultMatrix.block<2,2>(0,0);
+//     negativeTranslation(0,2) =-this->sizeVoxelData/2.0;//-testResultMatrix(0,2);
+//     negativeTranslation(1,2) =-this->sizeVoxelData/2.0;//-testResultMatrix(1,2);
+//     positiveTranslation(0,2) =this->sizeVoxelData/2.0;//testResultMatrix(0,2);
+//     positiveTranslation(1,2) =this->sizeVoxelData/2.0;//testResultMatrix(1,2);
+//
+//
+//     Eigen::Matrix3d testHowGood = negativeTranslation*testResultMatrix*positiveTranslation;
+//     double x = testHowGood(0,2);
+//     double y = testHowGood(1,2);
+//     testHowGood(0,2) = -y*cellSize;
+//     testHowGood(1,2) = -x*cellSize;
+//     Eigen::Matrix4d returnMatrix = Eigen::Matrix4d::Identity();
+//
+//     returnMatrix(0,3) = testHowGood(0,2);
+//     returnMatrix(1,3) = testHowGood(1,2);
+//     returnMatrix.block<2,2>(0,0) = testHowGood.block<2,2>(0,0);
+//
+//
+//
+//     if(debug){
+//         cv::cvtColor(convertedMat1,convertedMat1,cv::COLOR_BGR2GRAY);
+//         cv::cvtColor(convertedMat2,convertedMat2,cv::COLOR_BGR2GRAY);
+//
+//         //Apply the computed homography matrix to warp the second image
+//         cv::Mat Panorama(convertedMat1.rows, 2 * convertedMat1.cols,  CV_8U);
+//         warpPerspective(convertedMat2, Panorama, H, Panorama.size());
+//
+//
+//         Panorama.convertTo(Panorama,CV_64F,1.0/255.0);
+//         convertedMat1.convertTo(convertedMat1,CV_64F,1.0/255.0);
+//         convertedMat2.convertTo(convertedMat2,CV_64F,1.0/255.0);
+//
+//         for(int i = 0; i < convertedMat1.rows; i++){
+//             for(int j = 0; j < convertedMat1.cols; j++){
+//                 Panorama.at<double>(i,j) = (Panorama.at<double>(i,j)+convertedMat1.at<double>(i,j))/2.0;
+//             }
+//         }
+//         imshow("Panorama1", Panorama);
+//         for(int i = 0; i < convertedMat1.rows; i++){
+//             for(int j = 0; j < convertedMat1.cols; j++){
+//                 Panorama.at<double>(i,j) = (convertedMat1.at<double>(i,j)+convertedMat2.at<double>(i,j))/2.0;
+//             }
+//         }
+//         cv::waitKey(0);
+//     }
+//
+//
+//
+//     return returnMatrix;
+// }
+
+
+
+//
+// Eigen::Matrix4d scanRegistrationClass::gmmRegistrationD2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                    pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                    Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
+//     std::lock_guard<std::mutex> guard(*this->gmmd2dMutex);
+//
+//     //Convert scan to 2D vector xy points.
+//     std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
+//     std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
+//     for(int i = 0 ; i <cloudFirstScan.points.size();i++){
+//         currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     for(int i = 0 ; i <cloudSecondScan.points.size();i++){
+//         referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//     // reference scan
+//     shared_ptr<GaussianMixturesModel<2>> reference_gmm;
+//
+//     reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
+//     reference_gmm->balance_covariances(0.05);
+// //    reference_gmm->plot_components_density(0, referenceScanVector, false);
+//
+//     // current Scan
+//     shared_ptr<GaussianMixturesModel<2>> current_gmm;
+//     current_gmm = bayesian_gmm_constructor(currentScanVector, 50);
+//     current_gmm->balance_covariances(0.05);
+// //    current_gmm->plot_components_density(1, currentScanVector, false);
+//
+//
+//     shared_ptr<DistributionToDistribution2D> method(new DistributionToDistribution2D(reference_gmm, current_gmm));
+//     unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
+//     solver->compute_optimum();
+// //    solver->plot_process(0, false, 0.01);
+//     Eigen::Vector3d t_opt = solver->get_optimal();
+//     Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
+//
+// //  convert t_opt to Matrix4d
+//     std::cout << t_opt << std::endl;
+//     Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
+//     returnMatrix(0,3) = t_opt[0];
+//     returnMatrix(1,3) = t_opt[1];
+//
+//     if(h_opt.isZero(0.0000001)){
+//         returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//
+//     }
+//     return returnMatrix;
+//
+//
+// }
+//
+// Eigen::Matrix4d scanRegistrationClass::gmmRegistrationP2D(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
+//                                                           pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
+//                                                           Eigen::Matrix4d initialGuess, bool useInitialGuess, bool debug){
+//     std::lock_guard<std::mutex> guard(*this->gmmp2dMutex);
+//
+//     //Convert scan to 2D vector xy points.
+//     std::vector<Eigen::Vector2d> currentScanVector(cloudFirstScan.points.size());
+//     std::vector<Eigen::Vector2d> referenceScanVector(cloudSecondScan.points.size());
+//     for(int i = 0 ; i <cloudFirstScan.points.size();i++){
+//         currentScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     for(int i = 0 ; i <cloudSecondScan.points.size();i++){
+//         referenceScanVector[i] = Eigen::Vector2d(cloudFirstScan.points[i].x,cloudFirstScan.points[i].y);
+//     }
+//
+//     // reference scan
+//     shared_ptr<GaussianMixturesModel<2>> reference_gmm;
+//
+//     reference_gmm = bayesian_gmm_constructor(referenceScanVector, 50);
+//     reference_gmm->balance_covariances(0.05);
+// //    reference_gmm->plot_components_density(0, referenceScanVector, false);
+// //    std::cout << "test3:" <<reference_gmm->k() << std::endl;
+//
+//     // current Scan
+// //    shared_ptr<GaussianMixturesModel<2>> current_gmm;
+// //    current_gmm = bayesian_gmm_constructor(currentScanVector, 10);
+// //    current_gmm->balance_covariances(0.05);
+// //    current_gmm->plot_components_density(1, currentScanVector, true);
+//
+//
+//     shared_ptr<PointsToDistribution2D> method(
+//             new PointsToDistribution2D(reference_gmm, std::make_shared<std::vector<Eigen::Vector2d>>(currentScanVector)));
+//
+//     unique_ptr<CholeskyLineSearchNewtonMethod<3>> solver(new CholeskyLineSearchNewtonMethod<3>(method));
+//     solver->compute_optimum();
+// //    solver->plot_process(0, false, 0.01);
+//     Eigen::Vector3d t_opt = solver->get_optimal();
+//     Eigen::Matrix3d h_opt = solver->get_optimal_uncertainty();
+//
+// //  convert t_opt to Matrix4d
+//     Eigen::Matrix4d returnMatrix = generalHelpfulTools::getTransformationMatrixFromRPY(0,0,t_opt[2]);
+//     returnMatrix(0,3) = t_opt[0];
+//     returnMatrix(1,3) = t_opt[1];
+//
+//     if(h_opt.isZero(0.0000001) ){
+//         returnMatrix =  Eigen::Matrix4d::Identity();
+//         returnMatrix(3,3) = -1;
+//         return returnMatrix;
+//     }
+//     return returnMatrix;
+// }
