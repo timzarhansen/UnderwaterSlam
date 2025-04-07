@@ -7,6 +7,8 @@
 
 #include <gtsam/inference/Symbol.h>
 
+
+
 Eigen::Matrix4d
 scanRegistrationClass::generalizedIcpRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,
                                                   pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan,
@@ -89,6 +91,50 @@ scanRegistrationClass::generalizedIcpRegistrationSimple(pcl::PointCloud<pcl::Poi
     pcl::PointCloud<pcl::PointXYZ> Final;
     return this->generalizedIcpRegistration(cloudFirstScan, cloudSecondScan, Final,
                                                              fitnessScore, guess);
+}
+
+Eigen::Matrix4d
+scanRegistrationClass::predatorRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan) {
+
+
+    auto request = std::make_shared<commonbluerovmsg::srv::RequestOnePotentialSolution3D::Request>();
+    sensor_msgs::msg::PointCloud2 cloud1,cloud2;
+    pcl::toROSMsg(cloudFirstScan,cloud1);
+    request->pcl_scan_1 = cloud1;
+    pcl::toROSMsg(cloudSecondScan,cloud2);
+    request->pcl_scan_2 = cloud2;
+
+
+
+    auto future2 = this->predatorClient->async_send_request(request);
+    // std::cout<<"Send request. "<<std::endl;
+    Eigen::Matrix4d resultingTransformation;
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future2) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+        // std::cout<<"result is here now. "<<std::endl;
+        // Wait for the result.
+        try {
+            auto response = future2.get();
+            geometry_msgs::msg::Pose ourResult = response->resulting_transformation;
+            // convert our result to resultingTransformation
+            Eigen::Quaterniond rotation(ourResult.orientation.w,
+                                                ourResult.orientation.x,
+                                                ourResult.orientation.y,
+                                                ourResult.orientation.z);
+
+            resultingTransformation.block<3, 3>(0, 0) = rotation.toRotationMatrix();
+            resultingTransformation.block<3, 1>(0, 3) = Eigen::Vector3d(
+                ourResult.position.x,
+                ourResult.position.y,
+                ourResult.position.z);
+
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Service call failed.");
+        }
+    }
+    // this->predatorRegistration();
+    return resultingTransformation;
 }
 
 

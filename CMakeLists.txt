@@ -167,7 +167,7 @@ target_link_libraries(posegraph PUBLIC generalinterface json generalhelpfullib g
 ################################################################################
 
 add_library(registrationlib SHARED src/registration/src/scanRegistrationClass.cpp )
-ament_target_dependencies(registrationlib Eigen3 rclcpp  fsregistration tf2 tf2_geometry_msgs GTSAM PCL )
+ament_target_dependencies(registrationlib Eigen3 rclcpp  fsregistration tf2 tf2_geometry_msgs GTSAM PCL pcl_conversions commonbluerovmsg )
 target_include_directories(registrationlib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/registration/include ${OpenCV_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS} ${INCLUDE_DIRECTORIES_ORU} ${PCL_INCLUDE_DIRS})
 target_link_libraries(registrationlib  generalhelpfullib ${OpenCV_LIBS}  ${PCL_LIBRARIES} ) # ${PYTHON_LIBRARIES}
 
@@ -198,7 +198,7 @@ target_link_libraries(slamtools posegraph registrationlib )
 #target_include_directories(rosSlamTest PUBLIC ${INCLUDE_DIRECTORIES_ORU})
 
 add_executable(odometryTest src/odometryRuns/odometryS3E.cpp)
-ament_target_dependencies(odometryTest GTSAM geometry_msgs nav_msgs commonbluerovmsg pcl_conversions PCL)
+ament_target_dependencies(odometryTest GTSAM geometry_msgs nav_msgs commonbluerovmsg PCL)
 target_link_libraries(odometryTest ${OpenCV_LIBS} posegraph slamtools) # registrationlib ${PCL_LIBRARIES}
 target_include_directories(odometryTest PUBLIC ${INCLUDE_DIRECTORIES_ORU}) # ${PCL_INCLUDE_DIRS}
 

@@ -88,7 +88,7 @@ public:
 
         if (this->which_registration=="fs3d32"||this->which_registration=="fs3d32IG"||
         this->which_registration=="ICP"||this->which_registration=="GICP"||this->which_registration=="fs3d32ICP"||this->which_registration=="fs3d32IGICP"||
-        this->which_registration=="fs3d32GICP"||this->which_registration=="fs3d32IGGICP") {
+        this->which_registration=="fs3d32GICP"||this->which_registration=="fs3d32IGGICP"||this->which_registration=="predator") {
             this->dimension_of_registration = 32;
             this->voxel_size = 2*this->scan_radius_max/32;
             this->scanRegistrationObject = new scanRegistrationClass(32);
@@ -179,6 +179,7 @@ this->which_registration=="fs3d128IG"||this->which_registration=="fs3d128IGICP"|
             whichRobot = "Carol";
         }
         this->folderForSaving = std::string(this->which_registration+"_"+std::to_string(this->number_of_skips)+"_"+std::to_string(this->scan_radius_max)+"_"+std::to_string(level_potential_translation)+"_"+whichRobot);
+        this->startedEndSequence = false;
         std::cout << "endet initilization" << std::endl;
     }
 
@@ -237,6 +238,10 @@ private:
     //PCL for memory Saving
     pclMeasurement lastPCL;
     pclMeasurement currentPCl;
+    bool startedEndSequence;
+
+
+
 
     void valodyneCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(this->pclMutex);
@@ -640,6 +645,9 @@ private:
         double timeToCalculate = std::chrono::duration_cast<std::chrono::seconds>(currentTime - this->time_last_pointcloud).count();
         std::cout << "Timing function called: " << timeToCalculate << " ___ " << this->time_until_save*60 << std::endl;
         if (timeToCalculate>this->time_until_save*60) {
+            std::cout << "running last stuff now starting" << std::endl;
+            this->startedEndSequence = true;
+            sleep(60);
             while (this->updatingPCLCallback(1)) {
                 //doNothing
                 std::cout << "running last PCLs in dataset" << std::endl;
@@ -672,7 +680,14 @@ private:
             // std::cout << "our match after GICP" << std::endl;
             // std::cout << finalTransformation << std::endl;
         }
-
+        if (registrationMethod=="predator") {
+            // Eigen::Matrix4d resultingICPRegistration = this->scanRegistrationObject->generalizedIcpRegistrationSimple(firstPCL,secondPCL,fitnessScore,initialGuess);
+            std::cout << "Starting Predator Registration" << std::endl;
+            Eigen::Matrix4d resultingPredatorRegistration = this->scanRegistrationObject->predatorRegistration(firstPCL,secondPCL);
+            finalTransformation = resultingPredatorRegistration;
+            std::cout << "our match after predator" << std::endl;
+            std::cout << finalTransformation << std::endl;
+        }
 
         // FS3D stuff
         if (registrationMethod=="fs3d32" || registrationMethod=="fs3d64"||registrationMethod=="fs3d128"||
@@ -910,12 +925,18 @@ public:
     void run()
     {
         std::cout << "running now in while Loop" << std::endl;
-        rclcpp::Rate loop_rate(1);
+        rclcpp::Rate loop_rate(2);
         while (rclcpp::ok()) // Check if the ROS 2 node is still running
         {
-            bool didComputationHappen = this->updatingPCLCallback(0);
-            if (!didComputationHappen) {
-                loop_rate.sleep(); // Sleep for 0.01 second to avoid high CPU usage
+            if (!this->startedEndSequence)
+            {
+                bool didComputationHappen = this->updatingPCLCallback(0);
+                if (!didComputationHappen) {
+                    loop_rate.sleep(); // Sleep for 2 second to avoid high CPU usage
+                }
+            }else
+            {
+                loop_rate.sleep();
             }
         }
     }

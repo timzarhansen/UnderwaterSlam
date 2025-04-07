@@ -10,6 +10,8 @@
 #include "fsregistration/srv/request_one_potential_solution2_d.hpp"
 #include "fsregistration/srv/request_list_potential_solution3_d.hpp"
 #include "fsregistration/srv/request_one_potential_solution3_d.hpp"
+#include "commonbluerovmsg/srv/request_one_potential_solution3_d.hpp"
+#include <pcl_conversions/pcl_conversions.h>
 #include "vector"
 #include <opencv4/opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
@@ -43,6 +45,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/registration/icp.h>
 #include <pcl/registration/sample_consensus_prerejective.h>
+
 //#include <pcl/visualization/pcl_visualizer.h>
 
 //#include "softDescriptorRegistration.h"
@@ -132,6 +135,8 @@ public:
         "fs3D/registration/all_solutions");
         this->onePotentialClient3D = this->create_client<fsregistration::srv::RequestOnePotentialSolution3D>(
 "fs3D/registration/one_solution");
+        this->predatorClient = this->create_client<commonbluerovmsg::srv::RequestOnePotentialSolution3D>(
+"predator_service");
 
     }
 
@@ -216,6 +221,8 @@ public:
                                                              Eigen::Matrix3d &covarianceMatrix,
                                                              double cellSize,double &timeToCalculate,double level_potential_translation);
 
+    Eigen::Matrix4d predatorRegistration(pcl::PointCloud<pcl::PointXYZ> &cloudFirstScan,pcl::PointCloud<pcl::PointXYZ> &cloudSecondScan);
+
     // Eigen::Matrix4d registrationFourerMellin(double voxelData1Input[],
     //                                          double voxelData2Input[],
     //                                          double cellSize,
@@ -242,6 +249,7 @@ private:
     rclcpp::Client<fsregistration::srv::RequestListPotentialSolution2D>::SharedPtr listPotentialClient2D;
     rclcpp::Client<fsregistration::srv::RequestListPotentialSolution3D>::SharedPtr listPotentialClient3D;
     rclcpp::Client<fsregistration::srv::RequestOnePotentialSolution3D>::SharedPtr onePotentialClient3D;
+    rclcpp::Client<commonbluerovmsg::srv::RequestOnePotentialSolution3D>::SharedPtr predatorClient;
     int sizeVoxelData;
 
     std::mutex *icpMutex,*ndtd2dMutex,*ndtp2dMutex,*fourierMellinMutex,*oursMutex,*featureBasedMutex,*gmmd2dMutex,*gmmp2dMutex;
